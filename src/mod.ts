@@ -4,7 +4,7 @@ import { channelComposer } from "./composers/channel.ts";
 import { deletePost, getPost } from "./db/channel.ts";
 
 export const bot = new Bot(Deno.env.get("TOKEN") || "");
-export const kv = await Deno.openKv();
+export const kv = await Deno.openKv("data.json");
 
 bot.use(entryComposer);
 bot.use(channelComposer);
