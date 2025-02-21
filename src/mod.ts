@@ -1,9 +1,7 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { entryComposer } from "./composers/entry.ts";
 import { channelComposer } from "./composers/channel.ts";
-import { channelKey, deletePost, getPost } from "./db/channel.ts";
-import data from "../data.json" with { type: "json" };
-import profiles from "../profiles.json" with { type: "json" };
+import { deletePost, getPost } from "./db/channel.ts";
 
 export const bot = new Bot(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
@@ -13,8 +11,8 @@ bot.use(channelComposer);
 
 bot.callbackQuery(
   "closed",
-  async (c) =>
-    await c.answerCallbackQuery({
+  async (ctx) =>
+    await ctx.answerCallbackQuery({
       text:
         "🔒 Запись закрыта!\n\nСкорее всего, вышло время, до которого можно было записаться.",
       show_alert: true,
@@ -34,4 +32,4 @@ kv.listenQueue(async (value: { channelId: number; date: Date }) => {
   await deletePost(channelId, date);
 });
 
-bot.catch((e) => console.error(e.message));
+bot.catch((err) => console.error(err.message));

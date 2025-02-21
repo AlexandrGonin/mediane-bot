@@ -7,7 +7,7 @@ import { getProfile } from "../db/profile.ts";
 export const entryComposer = new Composer();
 
 entryComposer.chatType("private").command("start", async (c) => {
-  const channelId = Number(c.msg.text.split(" ")[1]);
+  const channelId = Number(c.match);
   if (!channelId) return; // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
@@ -51,13 +51,13 @@ entryComposer.chatType("private").command("start", async (c) => {
   );
 });
 
-entryComposer.chatType("private").callbackQuery(/add:.*/, async (c) => {
-  const channelId = Number(c.callbackQuery.data.split(":")[1]);
+entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
+  const channelId = Number(ctx.callbackQuery.data.split(":")[1]);
   if (!channelId) return; // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
 
-  const chatMember = await c.api.getChatMember(channelId, c.from.id);
+  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
   const allowedStatuses = ["member", "creator", "administrator", "restricted"];
   if (!allowedStatuses.includes(chatMember.status)) return; // 3. Check if user is member of channel
 
@@ -67,8 +67,8 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (c) => {
       "🔒 Запись закрыта",
       "closed",
     );
-    await c.editMessageReplyMarkup({ reply_markup });
-    await c.answerCallbackQuery({
+    await ctx.editMessageReplyMarkup({ reply_markup });
+    await ctx.answerCallbackQuery({
       text:
         "🔒 Запись закрыта!\n\nСкорее всего, вышло время, до которого можно было записаться.",
       show_alert: true,
@@ -76,13 +76,13 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (c) => {
     return;
   }
 
-  await addEntry(channelId, c.from.id, new Date());
+  await addEntry(channelId, ctx.from.id, new Date());
 
   const reply_markup = new InlineKeyboard().text(
     "Отменить запись",
     `remove:${channelId}`,
   );
-  await c.editMessageText(
+  await ctx.editMessageText(
     `<b>Записан ✅</b>\nна ${
       new Date().toLocaleDateString("ru", {
         timeZone: "Asia/Yekaterinburg",
@@ -93,17 +93,17 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (c) => {
     }`,
     { parse_mode: "HTML", reply_markup },
   );
-  await c.answerCallbackQuery({ text: "Теперь ты записан." });
+  await ctx.answerCallbackQuery({ text: "Теперь ты записан." });
   await updatePost(channelId, new Date());
 });
 
-entryComposer.chatType("private").callbackQuery(/remove:.*/, async (c) => {
-  const channelId = Number(c.callbackQuery.data.split(":")[1]);
+entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
+  const channelId = Number(ctx.callbackQuery.data.split(":")[1]);
   if (!channelId) return; // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
 
-  const chatMember = await c.api.getChatMember(channelId, c.from.id);
+  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
   const allowedStatuses = ["member", "creator", "administrator", "restricted"];
   if (!allowedStatuses.includes(chatMember.status)) return; // 3. Check if user is member of channel
 
@@ -113,8 +113,8 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (c) => {
       "🔒 Запись закрыта",
       "closed",
     );
-    await c.editMessageReplyMarkup({ reply_markup });
-    await c.answerCallbackQuery({
+    await ctx.editMessageReplyMarkup({ reply_markup });
+    await ctx.answerCallbackQuery({
       text:
         "🔒 Запись закрыта!\n\nСкорее всего, вышло время, до которого можно было записаться.",
       show_alert: true,
@@ -122,13 +122,13 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (c) => {
     return;
   }
 
-  await removeEntry(channelId, c.from.id, new Date());
+  await removeEntry(channelId, ctx.from.id, new Date());
 
   const reply_markup = new InlineKeyboard().text(
     "Записаться",
     `add:${channelId}`,
   );
-  await c.editMessageText(
+  await ctx.editMessageText(
     `<b>Не записан 🚫</b>\nна ${
       new Date().toLocaleDateString("ru", {
         timeZone: "Asia/Yekaterinburg",
@@ -139,6 +139,6 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (c) => {
     }`,
     { parse_mode: "HTML", reply_markup },
   );
-  await c.answerCallbackQuery({ text: "Ты больше не записан." });
+  await ctx.answerCallbackQuery({ text: "Ты больше не записан." });
   await updatePost(channelId, new Date());
 });
