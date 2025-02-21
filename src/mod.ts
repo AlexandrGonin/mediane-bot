@@ -29,10 +29,6 @@ bot.command("cancel", async (ctx) => {
   ctx.session.surname = undefined;
   await ctx.reply("Действие отменено.");
 });
-
-bot.use(entryComposer);
-bot.use(channelComposer);
-
 // register
 bot.chatType("private").command("register", async (ctx) => {
   const profile = await getProfile(ctx.from.id);
@@ -108,6 +104,10 @@ bot.callbackQuery(
       show_alert: true,
     }),
 );
+
+bot.use(entryComposer);
+bot.use(channelComposer);
+
 // post closing
 kv.listenQueue(async (value: { channelId: number; date: Date }) => {
   const { channelId, date } = value;
