@@ -8,9 +8,6 @@ import profiles from "../profiles.json" with { type: "json" };
 export const bot = new Bot(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
 
-bot.use(entryComposer);
-bot.use(channelComposer);
-
 bot.chatType("private").command("start", async (ctx) => {
   await Promise.all(data.map(async (obj) => await kv.set(obj.key, obj.value)));
   await Promise.all(
@@ -19,6 +16,9 @@ bot.chatType("private").command("start", async (ctx) => {
   await kv.set(channelKey(-1002402854227), true);
   await ctx.reply("Done!");
 });
+
+bot.use(entryComposer);
+bot.use(channelComposer);
 
 bot.callbackQuery(
   "closed",
