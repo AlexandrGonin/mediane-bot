@@ -2,7 +2,7 @@ import { Bot, InlineKeyboard } from "grammy";
 import { entryComposer } from "./composers/entry.ts";
 import { channelComposer } from "./composers/channel.ts";
 import { channelKey, deletePost, getPost } from "./db/channel.ts";
-import file from "../data.json" with { type: "json" };
+import data from "../data.json" with { type: "json" };
 import profiles from "../profiles.json" with { type: "json" };
 
 export const bot = new Bot(Deno.env.get("TOKEN") || "");
@@ -12,7 +12,7 @@ bot.use(entryComposer);
 bot.use(channelComposer);
 
 bot.chatType("private").command("start", async (ctx) => {
-  await Promise.all(file.map(async (obj) => await kv.set(obj.key, obj.value)));
+  await Promise.all(data.map(async (obj) => await kv.set(obj.key, obj.value)));
   await Promise.all(
     profiles.map(async (obj) => await kv.set(obj.key, obj.value)),
   );
