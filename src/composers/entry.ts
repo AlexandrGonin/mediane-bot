@@ -6,25 +6,27 @@ import { getProfile } from "../db/profile.ts";
 
 export const entryComposer = new Composer();
 
-entryComposer.chatType("private").command("start", async (c) => {
-  const channelId = Number(c.match);
+entryComposer.chatType("private").command("start", async (ctx) => {
+  const channelId = Number(ctx.match);
   if (!channelId) return; // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
 
-  const chatMember = await c.api.getChatMember(channelId, c.from.id);
+  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
   const allowedStatuses = ["member", "creator", "administrator", "restricted"];
   if (!allowedStatuses.includes(chatMember.status)) return; // 3. Check if user is member of channel
 
-  const profile = await getProfile(c.from.id);
+  const profile = await getProfile(ctx.from.id);
   if (!profile) {
-    await c.reply("Ты не зарегистрирован в системе! Обратись к @constant0fps");
+    await ctx.reply(
+      "Ты не зарегистрирован в системе! Обратись к @constant0fps",
+    );
     return;
   }
 
   const post = await getPost(channelId, new Date());
 
-  const entry = await getEntry(channelId, c.from.id, new Date());
+  const entry = await getEntry(channelId, ctx.from.id, new Date());
 
   const reply_markup = new InlineKeyboard();
   if (post) {
@@ -35,7 +37,7 @@ entryComposer.chatType("private").command("start", async (c) => {
     reply_markup.text("Запись закрыта 🔒", "closed");
   }
 
-  await c.reply(
+  await ctx.reply(
     `<b>${entry ? "Записан ✅" : "Не записан 🚫"}</b>\nна ${
       new Date().toLocaleDateString(
         "ru",
