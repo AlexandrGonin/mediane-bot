@@ -1,4 +1,5 @@
-import { Bot, Context, InlineKeyboard, SessionFlavor } from "grammy";
+import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
+import { freeStorage } from "https://deno.land/x/grammy_storages@v2.4.2/free/src/mod.ts";
 import { entryComposer } from "./composers/entry.ts";
 import { channelComposer } from "./composers/channel.ts";
 import { channelKey, deletePost, getPost } from "./db/channel.ts";
@@ -14,6 +15,20 @@ type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
+
+bot.use(
+  session({
+    initial: () => ({}),
+    storage: freeStorage<SessionData>(bot.token),
+  }),
+);
+
+bot.command("cancel", async (ctx) => {
+  ctx.session.registryStatus = undefined;
+  ctx.session.name = undefined;
+  ctx.session.surname = undefined;
+  await ctx.reply("Действие отменено.");
+});
 
 bot.use(entryComposer);
 bot.use(channelComposer);
