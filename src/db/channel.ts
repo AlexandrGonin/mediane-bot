@@ -1,6 +1,6 @@
 import { kv } from "../mod.ts";
 
-const channelKey = (id: number) => ["channel", id];
+export const channelKey = (id: number) => ["channel", id];
 
 export const checkChannel = async (id: number) =>
   (await kv.get<boolean>(channelKey(id))).value ? true : false;
