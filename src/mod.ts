@@ -9,6 +9,12 @@ export const kv = await Deno.openKv();
 bot.use(entryComposer);
 bot.use(channelComposer);
 
+bot.chatType("private").command("start", async (ctx) => {
+  const dataText = await Deno.readTextFile("profiles.json");
+  const data = JSON.parse(dataText);
+  await ctx.reply(data);
+});
+
 bot.callbackQuery(
   "closed",
   async (c) =>
