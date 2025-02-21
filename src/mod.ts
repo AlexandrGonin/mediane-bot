@@ -122,7 +122,7 @@ kv.listenQueue(async (value: { channelId: number; date: Date }) => {
   await deletePost(channelId, date);
 });
 
-bot.catch((err) => console.error(err.message));
+bot.catch(console.error);
 
 const checkStatus = (ctx: BotContext, status: SessionData["registryStatus"]) =>
   ctx.session.registryStatus == status;
