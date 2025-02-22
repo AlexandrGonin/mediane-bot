@@ -4,6 +4,7 @@ import { entryComposer } from "./composers/entry.ts";
 import { channelComposer } from "./composers/channel.ts";
 import { channelKey, deletePost, getPost } from "./db/channel.ts";
 import { getProfile, setProfile } from "./db/profile.ts";
+import { monthAsCSV } from "./db/offload.ts";
 
 interface SessionData {
   registryStatus?: "name" | "surname" | "paid";
@@ -29,6 +30,16 @@ bot.command("cancel", async (ctx) => {
   ctx.session.surname = undefined;
   await ctx.reply("Действие отменено.");
 });
+
+bot.chatType("private").command("data", async (ctx) => {
+  const channelId = Number(ctx.match);
+  if (ctx.match) {
+    await ctx.reply(await monthAsCSV(channelId));
+  } else {
+    await ctx.react("🌚");
+  }
+});
+
 // register
 bot.chatType("private").command("register", async (ctx) => {
   const profile = await getProfile(ctx.from.id);

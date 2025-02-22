@@ -1,6 +1,6 @@
 import { kv } from "../mod.ts";
 
-interface Profile {
+export interface Profile {
   firstName: string;
   lastName: string;
   isFree: boolean;
