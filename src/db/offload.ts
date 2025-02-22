@@ -7,7 +7,7 @@ export const monthAsCSV = async (channel: number) => {
     kv.list<Profile>({ prefix: ["profile"] }),
     (e) => ({ ...e.value, id: e.key[1] as number }),
   );
-  const profileEntries = profiles.map((e) => ({
+  const profileEntries = profiles.filter((e) => e.isFree).map((e) => ({
     ...e,
     entries: [] as string[],
   }));
@@ -34,7 +34,7 @@ export const monthAsCSV = async (channel: number) => {
   const data = profileEntries.map((e) => ({
     name: e.firstName,
     surname: e.lastName,
-    entries: e.entries.toString(),
+    entries: e.entries.map((s) => s.split("-")[0]).toString(),
   }));
   const csvText = stringify(data, {
     columns: ["name", "surname", "entries"],
