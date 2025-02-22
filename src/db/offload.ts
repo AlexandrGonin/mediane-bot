@@ -12,9 +12,9 @@ export const monthAsCSV = async (channel: number) => {
     entries: [] as string[],
   }));
   const dates = [] as string[];
-  for (let i = 22; i--;) {
+  for (let i = 28; i--;) {
     const date = new Date();
-    date.setDate(i);
+    date.setDate(i + 1);
     dates.push(date.toLocaleDateString("ru"));
   }
   dates.sort();
