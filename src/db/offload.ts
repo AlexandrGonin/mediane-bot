@@ -5,7 +5,7 @@ import { stringify } from "jsr:@std/csv";
 export const monthAsCSV = async (channel: number) => {
   const profiles = await Array.fromAsync(
     kv.list<Profile>({ prefix: ["profile"] }),
-    (e) => ({ ...e.value, id: e.key[3] as number }),
+    (e) => ({ ...e.value, id: e.key[1] as number }),
   );
   const profileEntries = profiles.map((e) => ({
     ...e,
