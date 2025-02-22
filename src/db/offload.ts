@@ -36,6 +36,6 @@ export const monthAsCSV = async (channel: number) => {
     surname: e.lastName,
     entries: e.entries,
   }));
-  const csvText = stringify(data, { columns: ["Имя", "Фамилия", "Даты"] });
+  const csvText = stringify(data, { columns: ["name", "surname", "dates"] });
   return csvText;
 };
