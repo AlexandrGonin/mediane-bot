@@ -34,8 +34,10 @@ export const monthAsCSV = async (channel: number) => {
   const data = profileEntries.map((e) => ({
     name: e.firstName,
     surname: e.lastName,
-    entries: e.entries,
+    entries: e.entries.toString(),
   }));
-  const csvText = stringify(data, { columns: ["name", "surname", "dates"] });
+  const csvText = stringify(data, {
+    columns: ["name", "surname", "entries"],
+  });
   return csvText;
 };
