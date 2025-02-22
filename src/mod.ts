@@ -87,9 +87,11 @@ bot.chatType("private")
   });
 // add channel to approved list
 bot.chatType("private").command("add", async (ctx) => {
+  await ctx.reply(ctx.match);
   const channelId = Number(ctx.match);
   if (channelId) {
     await kv.set(channelKey(channelId), true);
+    await ctx.reply("Сделано!");
   } else {
     await ctx.reply("Bad channel ID");
   }
