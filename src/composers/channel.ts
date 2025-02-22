@@ -7,6 +7,7 @@ import {
 } from "../db/channel.ts";
 import { bot } from "../mod.ts";
 import { listEntries } from "../db/entry.ts";
+import { sorting } from "../db/profile.ts";
 
 export const channelComposer = new Composer();
 
@@ -54,6 +55,8 @@ export const generatePostText = async (channelId: number, date: Date) => {
     entries,
     (profile) => profile.isFree ? "free" : "paid",
   );
+  free?.sort(sorting);
+  paid?.sort(sorting);
 
   const listText = [free, paid]
     .filter((l) => l != undefined)

@@ -21,3 +21,10 @@ export const setProfile = async (
     profileKey(id),
     { firstName: name, lastName: surname, isFree: free } as Profile,
   );
+
+export const sorting = (profile1: Profile, profile2: Profile) => {
+  if (profile1.lastName != profile2.lastName) {
+    return profile1.lastName.localeCompare(profile2.lastName);
+  }
+  return profile1.firstName.localeCompare(profile2.firstName);
+};
