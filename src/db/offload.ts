@@ -1,43 +1,48 @@
 import { kv } from "../mod.ts";
 import { Profile } from "./profile.ts";
-import { stringify } from "jsr:@std/csv";
 
 export const monthAsCSV = async (channel: number) => {
   const profiles = await Array.fromAsync(
     kv.list<Profile>({ prefix: ["profile"] }),
     (e) => ({ ...e.value, id: e.key[1] as number }),
   );
-  const profileEntries = profiles.filter((e) => e.isFree).map((e) => ({
-    ...e,
-    entries: [] as string[],
-  }));
-  const dates = [] as string[];
-  for (let i = 28; i--;) {
-    const date = new Date();
-    date.setDate(i + 1);
-    dates.push(date.toLocaleDateString("ru"));
-  }
-  dates.sort();
+  // all free profiles with array for dates of entries
+  const profileEntries = profiles
+    .filter((e) => e.isFree)
+    .map((e) => ({
+      ...e,
+      entries: [] as string[],
+    }));
 
+  // get all dates for current month
+  const dates = [] as string[];
+
+  const date = new Date();
+  date.setDate(1);
+  const month = date.getMonth();
+
+  while (date.getMonth() == month) {
+    dates.push(date.toLocaleDateString("ru"));
+    date.setDate(date.getDate() + 1);
+  }
+
+  // push dates of entries to respective profiles
   for (const date of dates) {
-    const entries = await Array.fromAsync(
+    const entryIds = await Array.fromAsync(
       kv.list({ prefix: ["entry", channel, date] }),
-      (e) => e.key[3] as number,
+      (e) => e.key[3] as number, // ids for each entry on date
     );
-    for (const entry of entries) {
-      const profileEntry = profileEntries.find((e) => e.id === entry);
-      if (profileEntry) {
-        profileEntry.entries.push(date);
-      }
+    for (const entryId of entryIds) {
+      const profileEntry = profileEntries.find((profile) =>
+        profile.id === entryId
+      );
+      profileEntry?.entries.push(date);
     }
   }
+  // gather data for plain text
   const data = profileEntries.map((e) => ({
-    name: e.firstName,
-    surname: e.lastName,
-    entries: e.entries.map((s) => s.split(".")[0]).toString(),
-  }));
-  const csvText = stringify(data, {
-    columns: ["name", "surname", "entries"],
-  });
-  return csvText;
+    fullname: e.firstName + e.lastName,
+    entries: e.entries,
+  })).filter((e) => e.entries);
+  return data.map((e) => `${e.fullname}: ${e.entries.join(", ")}`).join("\n");
 };

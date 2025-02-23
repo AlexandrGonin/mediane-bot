@@ -4,7 +4,6 @@
     "start": "deno run -A --watch dev.ts"
   },
   "imports": {
-    "@std/csv": "jsr:@std/csv@^1.0.5",
     "grammy": "https://deno.land/x/grammy@v1.30.0/mod.ts",
     "nanoid": "https://deno.land/x/nanoid/mod.ts"
   },
