@@ -4,7 +4,7 @@ import { entryComposer } from "./composers/entry.ts";
 import { channelComposer } from "./composers/channel.ts";
 import { channelKey, deletePost, getPost } from "./db/channel.ts";
 import { getProfile, setProfile } from "./db/profile.ts";
-import { monthAsCSV } from "./db/offload.ts";
+import { monthAsText } from "./db/offload.ts";
 
 interface SessionData {
   registryStatus?: "name" | "surname" | "paid";
@@ -34,7 +34,7 @@ bot.command("cancel", async (ctx) => {
 bot.chatType("private").command("data", async (ctx) => {
   const channelId = Number(ctx.match);
   if (ctx.match) {
-    await ctx.reply(await monthAsCSV(channelId));
+    await ctx.reply(await monthAsText(channelId));
   } else {
     await ctx.react("🌚");
   }
