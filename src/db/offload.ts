@@ -44,7 +44,7 @@ export const monthAsText = async (channel: number) => {
     name: e.firstName,
     surname: e.lastName,
     entries: e.entries.map((date) => date.split(".")[0]),
-  })).filter((e) => e.entries);
+  })).filter((e) => e.entries.length);
   return data.map((e) => `${e.name} ${e.surname}: ${e.entries.join(", ")}`)
     .join("\n");
 };
