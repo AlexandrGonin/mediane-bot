@@ -1,7 +1,7 @@
 import { kv } from "../mod.ts";
 import { Profile } from "./profile.ts";
 
-export const monthAsCSV = async (channel: number) => {
+export const monthAsText = async (channel: number) => {
   const profiles = await Array.fromAsync(
     kv.list<Profile>({ prefix: ["profile"] }),
     (e) => ({ ...e.value, id: e.key[1] as number }),
@@ -41,8 +41,10 @@ export const monthAsCSV = async (channel: number) => {
   }
   // gather data for plain text
   const data = profileEntries.map((e) => ({
-    fullname: e.firstName + e.lastName,
-    entries: e.entries,
+    name: e.firstName,
+    surname: e.lastName,
+    entries: e.entries.map((date) => date.split(".")[0]),
   })).filter((e) => e.entries);
-  return data.map((e) => `${e.fullname}: ${e.entries.join(", ")}`).join("\n");
+  return data.map((e) => `${e.name} ${e.surname}: ${e.entries.join(", ")}`)
+    .join("\n");
 };
