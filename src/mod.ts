@@ -61,12 +61,8 @@ bot.callbackQuery(
     }),
 );
 
-bot.use(registryComposer);
-bot.use(entryComposer);
-bot.use(channelComposer);
-
 // post closing
-kv.listenQueue(async (value: { channelId: number; date: Date }) => {
+const closePost = async (value: { channelId: number; date: Date }) => {
   const { channelId, date } = value;
   if (!channelId || !date) return;
 
@@ -77,6 +73,28 @@ kv.listenQueue(async (value: { channelId: number; date: Date }) => {
   await bot.api.editMessageReplyMarkup(channelId, post, { reply_markup });
 
   await deletePost(channelId, date);
+};
+
+bot.chatType("private").command("close", async (ctx) => {
+  const channelId = Number(ctx.match);
+  if (channelId) {
+    const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
+    const allowedStatuses = ["creator", "administrator"];
+    if (allowedStatuses.includes(chatMember.status)) {
+      await closePost({ channelId, date: new Date() });
+      await ctx.react("👌");
+    } else {
+      await ctx.react("🤨");
+    }
+  } else {
+    await ctx.react("🌚");
+  }
 });
+
+bot.use(registryComposer);
+bot.use(entryComposer);
+bot.use(channelComposer);
+
+kv.listenQueue(closePost);
 
 bot.catch(console.error);
