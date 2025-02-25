@@ -8,7 +8,6 @@ export const monthAsText = async (channel: number) => {
   );
   // all free profiles with array for dates of entries
   const profileEntries = profiles
-    .filter((e) => e.isFree)
     .map((e) => ({
       ...e,
       entries: [] as string[],

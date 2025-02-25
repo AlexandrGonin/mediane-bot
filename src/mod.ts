@@ -31,6 +31,7 @@ bot.command("cancel", async (ctx) => {
   await ctx.reply("Действие отменено.");
 });
 
+// get data for this month
 bot.chatType("private").command("data", async (ctx) => {
   const channelId = Number(ctx.match);
   if (ctx.match) {
