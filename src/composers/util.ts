@@ -5,7 +5,7 @@ import { monthAsText } from "../db/offload.ts";
 import { profilesToIds } from "../db/profile.ts";
 import { kv } from "../mod.ts";
 
-const utilComposer = new Composer();
+export const utilComposer = new Composer();
 
 // get data for this month
 utilComposer.chatType("private").command("data", async (ctx) => {
