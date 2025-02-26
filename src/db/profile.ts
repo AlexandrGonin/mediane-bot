@@ -28,3 +28,16 @@ export const sorting = (profile1: Profile, profile2: Profile) => {
   }
   return profile1.firstName.localeCompare(profile2.firstName);
 };
+
+export const profilesToIds = async () => {
+  const profiles = await Array.fromAsync(
+    kv.list<Profile>({ prefix: ["profile"] }),
+    (e) => ({
+      ...e.value,
+      id: e.key[1],
+    }),
+  );
+  return profiles.map((e) =>
+    `${e.firstName} ${e.lastName}'s id: ${e.id.toString()}`
+  ).join("\n");
+};

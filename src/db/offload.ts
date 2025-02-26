@@ -24,7 +24,6 @@ export const monthAsText = async (channel: number) => {
     dates.push(date.toLocaleDateString("ru"));
     date.setDate(date.getDate() + 1);
   }
-
   // push dates of entries to respective profiles
   for (const date of dates) {
     const entryIds = await Array.fromAsync(
@@ -46,4 +45,17 @@ export const monthAsText = async (channel: number) => {
   })).filter((e) => e.entries.length);
   return data.map((e) => `${e.name} ${e.surname}: ${e.entries.join(", ")}`)
     .join("\n");
+};
+
+export const profilesToIds = async () => {
+  const profiles = await Array.fromAsync(
+    kv.list<Profile>({ prefix: ["profile"] }),
+    (e) => ({
+      ...e.value,
+      id: e.key[1],
+    }),
+  );
+  return profiles.map((e) =>
+    `${e.firstName} ${e.lastName}'s id: ${e.id.toString()}`
+  ).join("\n");
 };
