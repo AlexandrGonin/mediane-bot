@@ -4,6 +4,7 @@ import { channelKey } from "../db/channel.ts";
 import { monthAsText } from "../db/offload.ts";
 import { profilesToIds } from "../db/profile.ts";
 import { kv } from "../mod.ts";
+import { updatePost } from "./channel.ts";
 
 export const utilComposer = new Composer();
 
@@ -25,6 +26,7 @@ utilComposer.chatType("private").command("rm", async (ctx) => {
   const [channelId, profileId] = ctx.match.split(" ").map(Number);
   if (channelId && profileId) {
     await removeEntry(channelId, profileId, new Date());
+    await updatePost(channelId, new Date());
     await ctx.react("👌");
   } else {
     await ctx.react("🌚");
