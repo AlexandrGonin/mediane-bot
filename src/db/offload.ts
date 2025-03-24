@@ -14,7 +14,7 @@ export const monthAsText = async (channel: number) => {
     }));
 
   // get all dates for current month
-  const dates = [] as string[];
+  const dates: string[] = [];
 
   const date = new Date();
   date.setDate(1);
