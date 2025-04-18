@@ -31,3 +31,6 @@ export const requestPostClose = async (
   date: Date,
   delay: number,
 ) => await kv.enqueue({ channelId, date }, { delay });
+
+export const listChannels = async () => 
+  (await Array.fromAsync(kv.list<boolean>({prefix: ["channel"]}), (e) => ({id: Number(e.key[1]), isAllowed: e.value}))).filter((e) => e.isAllowed)

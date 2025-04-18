@@ -1,9 +1,9 @@
 import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
 import { freeStorage } from "https://deno.land/x/grammy_storages@v2.4.2/free/src/mod.ts";
 import { entryComposer } from "./composers/entry.ts";
-import { channelComposer } from "./composers/channel.ts";
+import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { registryComposer } from "./composers/registry.ts";
-import { deletePost, getPost } from "./db/channel.ts";
+import { deletePost, getPost, listChannels, requestPostClose, setPost } from "./db/channel.ts";
 import { utilComposer } from "./composers/util.ts";
 
 export interface SessionData {
@@ -75,6 +75,25 @@ bot.use(utilComposer);
 bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
+
+Deno.cron('daily entry', '0 7 * * 1-6', async () => {
+  const now = new Date();
+  const delay = 3 * 60 * 60 * 1000;
+  const channels = await listChannels();
+  for (const channel of channels) {
+    const reply_markup = new InlineKeyboard().url(
+      "Запись в боте",
+      `https://t.me/${bot.botInfo.username}?start=${channel.id}`,
+    );
+    const msgId = (await bot.api.sendMessage(
+      channel.id,
+      await generatePostText(channel.id, now),
+      { reply_markup, parse_mode: "HTML" },
+    )).message_id;
+    await setPost(channel.id, now, msgId);
+    await requestPostClose(channel.id, now, delay);
+  }
+})
 
 kv.listenQueue(closePost);
 

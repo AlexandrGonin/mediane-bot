@@ -2,7 +2,6 @@ import { Composer } from "grammy";
 import { removeEntry } from "../db/entry.ts";
 import { channelKey } from "../db/channel.ts";
 import { monthAsText } from "../db/offload.ts";
-import { profilesToIds } from "../db/profile.ts";
 import { kv } from "../mod.ts";
 import { updatePost } from "./channel.ts";
 
@@ -16,10 +15,6 @@ utilComposer.chatType("private").command("data", async (ctx) => {
   } else {
     await ctx.react("🌚");
   }
-});
-
-utilComposer.chatType("private").command("profiles", async (ctx) => {
-  await ctx.reply(await profilesToIds());
 });
 
 utilComposer.chatType("private").command("rm", async (ctx) => {
@@ -38,7 +33,7 @@ utilComposer.chatType("private").command("add", async (ctx) => {
   const channelId = Number(ctx.match);
   if (channelId) {
     await kv.set(channelKey(channelId), true);
-    await ctx.reply(`Канал с ID ${ctx.match} добавлен в разрешенные`);
+    await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
   } else {
     await ctx.reply("Неправильный ID канала");
   }

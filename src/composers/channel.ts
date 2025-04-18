@@ -20,8 +20,9 @@ channelComposer.use(async (c, next) => {
 channelComposer.chatType("channel").command("post", async (c) => {
   const delayToClose = 3 * 60 * 60 * 1000;
 
-  await setPost(c.chatId, new Date(), c.msgId);
-  await requestPostClose(c.chatId, new Date(), delayToClose);
+  const now = new Date();
+  await setPost(c.chatId, now, c.msgId);
+  await requestPostClose(c.chatId, now, delayToClose);
 
   const reply_markup = new InlineKeyboard().url(
     "Запись в боте",
