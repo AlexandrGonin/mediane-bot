@@ -76,21 +76,20 @@ bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
 
-Deno.cron('daily entry', '0 7 * * 1-6', async () => {
+Deno.cron('daily entry', '0 7 * * MON-SAT', async () => {
   const now = new Date();
   const delay = 3 * 60 * 60 * 1000;
-  const channels = await listChannels();
-  for (const channel of channels) {
+  for (const channel of await listChannels()) {
     const reply_markup = new InlineKeyboard().url(
       "Запись в боте",
       `https://t.me/${bot.botInfo.username}?start=${channel.id}`,
     );
-    const msgId = (await bot.api.sendMessage(
+    const msg = await bot.api.sendMessage(
       channel.id,
       await generatePostText(channel.id, now),
       { reply_markup, parse_mode: "HTML" },
-    )).message_id;
-    await setPost(channel.id, now, msgId);
+    );
+    await setPost(channel.id, now, msg.message_id);
     await requestPostClose(channel.id, now, delay);
   }
 })
