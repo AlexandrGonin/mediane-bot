@@ -3,7 +3,13 @@ import { freeStorage } from "https://deno.land/x/grammy_storages@v2.4.2/free/src
 import { entryComposer } from "./composers/entry.ts";
 import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { registryComposer } from "./composers/registry.ts";
-import { deletePost, getPost, listChannels, requestPostClose, setPost } from "./db/channel.ts";
+import {
+  deletePost,
+  getPost,
+  listChannels,
+  requestPostClose,
+  setPost,
+} from "./db/channel.ts";
 import { utilComposer } from "./composers/util.ts";
 
 export interface SessionData {
@@ -57,18 +63,18 @@ const closePost = async (value: { channelId: number; date: Date }) => {
 
 bot.chatType("private").command("close", async (ctx) => {
   const channelId = Number(ctx.match);
-  if (channelId) {
-    const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
-    const allowedStatuses = ["creator", "administrator"];
-    if (allowedStatuses.includes(chatMember.status)) {
-      await closePost({ channelId, date: new Date() });
-      await ctx.react("👌");
-    } else {
-      await ctx.react("🤨");
-    }
-  } else {
+  if (!channelId) {
     await ctx.react("🌚");
+    return;
   }
+  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
+  const allowedStatuses = ["creator", "administrator"];
+  if (!allowedStatuses.includes(chatMember.status)) {
+    await ctx.react("🤨");
+    return;
+  }
+  await closePost({ channelId, date: new Date() });
+  await ctx.react("👌");
 });
 
 bot.use(utilComposer);
@@ -76,23 +82,29 @@ bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
 
-Deno.cron('daily entry', '0 7 * * MON-SAT', async () => {
-  const now = new Date();
+Deno.cron("daily entry", "0 7 * * MON-SAT", async () => {
   const delay = 3 * 60 * 60 * 1000;
+
   for (const channel of await listChannels()) {
+    const chatMember = await bot.api.getChatMember(channel.id, bot.botInfo.id);
+    if (chatMember.status != "administrator") continue;
+
+    const now = new Date();
     const reply_markup = new InlineKeyboard().url(
       "Запись в боте",
       `https://t.me/${bot.botInfo.username}?start=${channel.id}`,
     );
+
     const msg = await bot.api.sendMessage(
       channel.id,
       await generatePostText(channel.id, now),
       { reply_markup, parse_mode: "HTML" },
     );
+
     await setPost(channel.id, now, msg.message_id);
     await requestPostClose(channel.id, now, delay);
   }
-})
+});
 
 kv.listenQueue(closePost);
 

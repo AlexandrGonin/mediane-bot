@@ -1,4 +1,4 @@
-import { Composer, InlineKeyboard } from "grammy";
+import { Composer, Context, InlineKeyboard } from "grammy";
 import {
   checkChannel,
   getPost,
@@ -11,23 +11,22 @@ import { sorting } from "../db/profile.ts";
 
 export const channelComposer = new Composer();
 
-channelComposer.use(async (c, next) => {
-  if (c.chat?.type == "channel" && (await checkChannel(c.chatId || 0))) {
-    await next();
-  }
-});
+const check = async (ctx: Context) =>
+  ctx.chat?.type == "channel" &&
+  (await checkChannel(ctx.chat.id));
 
-channelComposer.chatType("channel").command("post", async (c) => {
+channelComposer.filter(check).command("post", async (c) => {
   const delayToClose = 3 * 60 * 60 * 1000;
 
   const now = new Date();
   await setPost(c.chatId, now, c.msgId);
   await requestPostClose(c.chatId, now, delayToClose);
 
-  const reply_markup = new InlineKeyboard().url(
-    "Запись в боте",
-    `https://t.me/${bot.botInfo.username}?start=${c.chatId}`,
-  );
+  const reply_markup = new InlineKeyboard()
+    .url(
+      "Запись в боте",
+      `https://t.me/${bot.botInfo.username}?start=${c.chatId}`,
+    );
   await c.editMessageText(await generatePostText(c.chatId, new Date()), {
     reply_markup,
     parse_mode: "HTML",
@@ -38,10 +37,11 @@ export const updatePost = async (channelId: number, date: Date) => {
   const post = await getPost(channelId, date);
   if (!post) return;
 
-  const reply_markup = new InlineKeyboard().url(
-    "Запись в боте",
-    `https://t.me/${bot.botInfo.username}?start=${channelId}`,
-  );
+  const reply_markup = new InlineKeyboard()
+    .url(
+      "Запись в боте",
+      `https://t.me/${bot.botInfo.username}?start=${channelId}`,
+    );
   await bot.api.editMessageText(
     channelId,
     post,
