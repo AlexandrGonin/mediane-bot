@@ -11,7 +11,6 @@ import {
   setPost,
 } from "./db/channel.ts";
 import { utilComposer } from "./composers/util.ts";
-import { BotError } from "https://deno.land/x/grammy@v1.30.0/composer.ts";
 
 export interface SessionData {
   registryStatus?: "name" | "surname" | "paid";
@@ -23,7 +22,7 @@ export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
-export const adminId = Number(await Deno.env.get("ADMIN_ID") || "");
+export const adminId = Number(Deno.env.get("ADMIN_ID") || "");
 
 bot.use(
   session({
