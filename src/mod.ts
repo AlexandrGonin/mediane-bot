@@ -11,6 +11,7 @@ import {
   setPost,
 } from "./db/channel.ts";
 import { utilComposer } from "./composers/util.ts";
+import { BotError } from "https://deno.land/x/grammy@v1.30.0/composer.ts";
 
 export interface SessionData {
   registryStatus?: "name" | "surname" | "paid";
@@ -22,7 +23,7 @@ export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
-export const adminId = Number(await Deno.env.get("ADMIN_ID") || "") 
+export const adminId = Number(await Deno.env.get("ADMIN_ID") || "");
 
 bot.use(
   session({
@@ -90,23 +91,23 @@ Deno.cron("daily entry", "0 7 * * MON-SAT", async () => {
   const delay = 3 * 60 * 60 * 1000;
 
   for (const channel of await listChannels()) {
-    const chatMember = await bot.api.getChatMember(channel.id, bot.botInfo.id);
-    if (chatMember.status != "administrator") continue;
-
     const now = new Date();
     const reply_markup = new InlineKeyboard().url(
       "Запись в боте",
       `https://t.me/${bot.botInfo.username}?start=${channel.id}`,
     );
+    try {
+      const msg = await bot.api.sendMessage(
+        channel.id,
+        await generatePostText(channel.id, now),
+        { reply_markup, parse_mode: "HTML" },
+      );
 
-    const msg = await bot.api.sendMessage(
-      channel.id,
-      await generatePostText(channel.id, now),
-      { reply_markup, parse_mode: "HTML" },
-    );
-
-    await setPost(channel.id, now, msg.message_id);
-    await requestPostClose(channel.id, now, delay);
+      await setPost(channel.id, now, msg.message_id);
+      await requestPostClose(channel.id, now, delay);
+    } catch {
+      console.error("Could not send message to allowed, channel, continuing");
+    }
   }
 });
 
