@@ -22,6 +22,7 @@ export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
+export const adminId = Number(await Deno.env.get("ADMIN_ID") || "") 
 
 bot.use(
   session({
@@ -54,6 +55,9 @@ const closePost = async (value: { channelId: number; date: Date }) => {
 
   const post = await getPost(channelId, date);
   if (!post) return;
+  if (adminId) {
+    await bot.api.forwardMessage(adminId, channelId, post);
+  }
 
   const reply_markup = new InlineKeyboard().text("🔒 Запись закрыта", "closed");
   await bot.api.editMessageReplyMarkup(channelId, post, { reply_markup });
