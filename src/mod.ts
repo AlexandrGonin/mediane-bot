@@ -22,6 +22,7 @@ export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
+export const adminId = Number(await Deno.env.get("ADMIN_ID") || "") 
 
 bot.use(
   session({
