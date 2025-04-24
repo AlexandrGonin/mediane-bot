@@ -55,6 +55,9 @@ const closePost = async (value: { channelId: number; date: Date }) => {
 
   const post = await getPost(channelId, date);
   if (!post) return;
+  if (adminId) {
+    await bot.api.forwardMessage(adminId, channelId, post);
+  }
 
   const reply_markup = new InlineKeyboard().text("🔒 Запись закрыта", "closed");
   await bot.api.editMessageReplyMarkup(channelId, post, { reply_markup });
