@@ -86,7 +86,7 @@ bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
 
-Deno.cron("daily entry", "0 7 * * MON-SAT", async () => {
+Deno.cron("daily entry", "30 2 * * MON-SAT", async () => {
   const delay = 3 * 60 * 60 * 1000;
 
   for (const channel of await listChannels()) {
