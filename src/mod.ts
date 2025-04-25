@@ -91,6 +91,7 @@ Deno.cron("daily entry", "30 2 * * MON-SAT", async () => {
 
   for (const channel of await listChannels()) {
     const now = new Date();
+    await bot.init();
     const reply_markup = new InlineKeyboard().url(
       "Запись в боте",
       `https://t.me/${bot.botInfo.username}?start=${channel.id}`,
