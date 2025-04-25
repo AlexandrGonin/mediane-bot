@@ -88,22 +88,22 @@ bot.use(channelComposer);
 
 Deno.cron("daily entry", "30 2 * * MON-SAT", async () => {
   const delay = 3 * 60 * 60 * 1000;
-  await bot.init();
+  const botName = (await bot.api.getMe()).username;
 
   for (const channel of await listChannels()) {
     const now = new Date();
     const reply_markup = new InlineKeyboard().url(
       "Запись в боте",
-      `https://t.me/${bot.botInfo.username}?start=${channel.id}`,
+      `https://t.me/${botName}?start=${channel.id}`,
     );
     try {
-      const msg = await bot.api.sendMessage(
+      const post = await bot.api.sendMessage(
         channel.id,
         await generatePostText(channel.id, now),
         { reply_markup, parse_mode: "HTML" },
       );
 
-      await setPost(channel.id, now, msg.message_id);
+      await setPost(channel.id, now, post.message_id);
       await requestPostClose(channel.id, now, delay);
     } catch {
       console.error("Could not send message to allowed, channel, continuing");

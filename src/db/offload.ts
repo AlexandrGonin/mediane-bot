@@ -19,10 +19,12 @@ export const monthAsText = async (channel: number) => {
   const date = new Date();
   date.setDate(1);
   const month = date.getMonth();
-
-  while (date.getMonth() == month) {
+  for (
+    const date = new Date();
+    date.getMonth() == month;
+    date.setDate(date.getDate() + 1)
+  ) {
     dates.push(date.toLocaleDateString("ru"));
-    date.setDate(date.getDate() + 1);
   }
   // push dates of entries to respective profiles
   for (const date of dates) {
@@ -39,8 +41,7 @@ export const monthAsText = async (channel: number) => {
   }
   // gather data for plain text
   const data = profileEntries.map((e) => ({
-    name: e.firstName,
-    surname: e.lastName,
+    ...e,
     entries: e.entries.map((date) => date.split(".")[0]),
   })).filter((e) => e.entries.length);
   return data.map((e) => `${e.name} ${e.surname}: ${e.entries.join(", ")}`)
@@ -55,7 +56,6 @@ export const profilesToIds = async () => {
       id: e.key[1],
     }),
   );
-  return profiles.map((e) =>
-    `${e.firstName} ${e.lastName}'s id: ${e.id.toString()}`
-  ).join("\n");
+  return profiles.map((e) => `${e.name} ${e.surname}'s id: ${e.id.toString()}`)
+    .join("\n");
 };
