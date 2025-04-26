@@ -40,3 +40,12 @@ export const listChannels = async () =>
       isAllowed: e.value,
     }),
   )).filter((c) => c.isAllowed);
+
+export const adminKey = (channelId: number) => ["admin", channelId];
+
+export const setAdmin = async (channelId: number, userId: number) =>
+  await kv.set(adminKey(channelId), userId);
+
+export const getAdmin = async (
+  channelId: number,
+) => (await kv.get<number>(adminKey(channelId))).value || 0;

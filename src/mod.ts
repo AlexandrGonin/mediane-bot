@@ -5,6 +5,7 @@ import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { registryComposer } from "./composers/registry.ts";
 import {
   deletePost,
+  getAdmin,
   getPost,
   listChannels,
   requestPostClose,
@@ -55,6 +56,7 @@ const closePost = async (value: { channelId: number; date: Date }) => {
 
   const post = await getPost(channelId, date);
   if (!post) return;
+  const adminId = await getAdmin(channelId);
   if (adminId) {
     await bot.api.forwardMessage(adminId, channelId, post);
   }
