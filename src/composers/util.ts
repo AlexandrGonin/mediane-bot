@@ -1,9 +1,6 @@
 import { Composer } from "grammy";
-import { removeEntry } from "../db/entry.ts";
-import { channelKey, setAdmin } from "../db/channel.ts";
+import { setAdmin, setChannel } from "../db/channel.ts";
 import { monthAsText } from "../db/offload.ts";
-import { kv } from "../mod.ts";
-import { updatePost } from "./channel.ts";
 
 export const utilComposer = new Composer();
 
@@ -11,18 +8,7 @@ export const utilComposer = new Composer();
 utilComposer.chatType("private").command("data", async (ctx) => {
   const channelId = Number(ctx.match);
   if (ctx.match) {
-    await ctx.reply(await monthAsText(channelId));
-  } else {
-    await ctx.react("🌚");
-  }
-});
-
-utilComposer.chatType("private").command("rm", async (ctx) => {
-  const [channelId, profileId] = ctx.match.split(" ").map(Number);
-  if (channelId && profileId) {
-    await removeEntry(channelId, profileId, new Date());
-    await updatePost(channelId, new Date());
-    await ctx.react("👌");
+    await ctx.reply(await monthAsText(channelId, (new Date()).getMonth()));
   } else {
     await ctx.react("🌚");
   }
@@ -32,7 +18,7 @@ utilComposer.chatType("private").command("rm", async (ctx) => {
 utilComposer.chatType("private").command("add", async (ctx) => {
   const channelId = Number(ctx.match);
   if (channelId) {
-    await kv.set(channelKey(channelId), true);
+    await setChannel(channelId, true);
     await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
   } else {
     await ctx.reply("Неправильный ID канала");
