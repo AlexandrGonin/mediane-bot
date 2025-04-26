@@ -10,14 +10,11 @@ export const monthAsText = async (channelId: number, month: number) => {
     date.getMonth() == month;
     date.setDate(date.getDate() + 1)
   ) {
-    console.log(date.toLocaleDateString("ru"));
     dates.push(new Date(date));
   }
-  console.log(dates.map((val) => val.toLocaleDateString("ru")));
   const table = new Map<Profile, boolean[]>();
   for (const date of dates) {
     const entries = await listEntries(channelId, date);
-    console.log(date, entries);
     for (const profile of entries) {
       table.set(
         profile,
@@ -28,7 +25,6 @@ export const monthAsText = async (channelId: number, month: number) => {
       );
     }
   }
-  console.log(table);
   const days = Array<number>(dates.length).keys().toArray().map((val) =>
     val + 1
   );
