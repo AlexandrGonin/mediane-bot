@@ -1,6 +1,7 @@
 import { Composer } from "grammy";
 import { setAdmin, setChannel } from "../db/channel.ts";
 import { monthAsText } from "../db/offload.ts";
+import { closePost } from "../mod.ts";
 
 export const utilComposer = new Composer();
 
@@ -33,4 +34,20 @@ utilComposer.chatType("private").command("set", async (ctx) => {
     await setAdmin(channelId, userId);
     await ctx.react("✍");
   }
+});
+
+utilComposer.chatType("private").command("close", async (ctx) => {
+  const channelId = Number(ctx.match);
+  if (!channelId) {
+    await ctx.react("🌚");
+    return;
+  }
+  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
+  const allowedStatuses = ["creator", "administrator"];
+  if (!allowedStatuses.includes(chatMember.status)) {
+    await ctx.react("🤨");
+    return;
+  }
+  await closePost({ channelId, date: new Date() });
+  await ctx.react("👌");
 });

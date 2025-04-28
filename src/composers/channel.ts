@@ -57,6 +57,9 @@ export const generatePostText = async (channelId: number, date: Date) => {
     (profile) => profile.isFree ? "free" : "paid",
   );
 
+  free?.sort(sorting);
+  paid?.sort(sorting);
+
   const listText = [free, paid]
     .filter((l) => l != undefined)
     .map((l) => l.map((p) => `${p.name} ${p.surname}`).join("\n"))

@@ -77,6 +77,7 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
     });
     return;
   }
+  const entry = await getEntry(channelId, ctx.from.id, new Date());
 
   await addEntry(channelId, ctx.from.id, new Date());
 
@@ -96,7 +97,9 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
     { parse_mode: "HTML", reply_markup },
   );
   await ctx.answerCallbackQuery({ text: "Теперь ты записан." });
-  await updatePost(channelId, new Date());
+  if (!entry) {
+    await updatePost(channelId, new Date());
+  }
 });
 
 entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
@@ -123,6 +126,7 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
     });
     return;
   }
+  const entry = await getEntry(channelId, ctx.from.id, new Date());
 
   await removeEntry(channelId, ctx.from.id, new Date());
 
@@ -142,5 +146,7 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
     { parse_mode: "HTML", reply_markup },
   );
   await ctx.answerCallbackQuery({ text: "Ты больше не записан." });
-  await updatePost(channelId, new Date());
+  if (entry) {
+    await updatePost(channelId, new Date());
+  }
 });

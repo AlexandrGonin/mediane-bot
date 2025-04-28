@@ -50,7 +50,7 @@ bot.callbackQuery(
 );
 
 // post closing
-const closePost = async (value: { channelId: number; date: Date }) => {
+export const closePost = async (value: { channelId: number; date: Date }) => {
   const { channelId, date } = value;
   if (!channelId || !date) return;
 
@@ -66,22 +66,6 @@ const closePost = async (value: { channelId: number; date: Date }) => {
 
   await deletePost(channelId, date);
 };
-
-bot.chatType("private").command("close", async (ctx) => {
-  const channelId = Number(ctx.match);
-  if (!channelId) {
-    await ctx.react("🌚");
-    return;
-  }
-  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
-  const allowedStatuses = ["creator", "administrator"];
-  if (!allowedStatuses.includes(chatMember.status)) {
-    await ctx.react("🤨");
-    return;
-  }
-  await closePost({ channelId, date: new Date() });
-  await ctx.react("👌");
-});
 
 bot.use(utilComposer);
 bot.use(registryComposer);

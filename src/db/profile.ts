@@ -22,9 +22,11 @@ export const setProfile = async (
     { name, surname, isFree } as Profile,
   );
 
+export const removeProfile = async (id: number) =>
+  await kv.delete(profileKey(id));
+
 export const sorting = (profile1: Profile, profile2: Profile) => {
-  if (profile1.surname != profile2.surname) {
-    return profile1.surname.localeCompare(profile2.surname);
-  }
-  return profile1.name.localeCompare(profile2.name);
+  return (profile1.surname != profile2.surname)
+    ? profile1.surname.localeCompare(profile2.surname)
+    : profile1.name.localeCompare(profile2.name);
 };
