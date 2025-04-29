@@ -56,6 +56,7 @@ export const generatePostText = async (channelId: number, date: Date) => {
     entries,
     (profile) => profile.isFree ? "free" : "paid",
   );
+  console.log(free, paid);
 
   free?.sort(sorting);
   paid?.sort(sorting);
