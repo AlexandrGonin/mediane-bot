@@ -63,7 +63,7 @@ export const generatePostText = async (channelId: number, date: Date) => {
 
   const listText = [free, paid]
     .filter((l) => l != undefined)
-    .map((l) => l.map((p) => `${p.name} ${p.surname}`).join("\n"))
+    .map((l) => l.map((p) => `${p.firstName} ${p.lastName}`).join("\n"))
     .join("\n");
 
   const header = "<b>Столовая</b>\n" +

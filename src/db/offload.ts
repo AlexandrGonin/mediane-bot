@@ -32,7 +32,7 @@ export const monthAsText = async (channelId: number, month: number) => {
   const text = `${
     table.entries().toArray().map(
       ([key, val]) =>
-        `${key.name} ${key.surname}, ${key.isFree ? "бп." : "пл."} : ${
+        `${key.firstName} ${key.lastName}, ${key.isFree ? "бп." : "пл."} : ${
           val.map((val) => val ? "+" : " ").join("")
         }`,
     ).join("\n")

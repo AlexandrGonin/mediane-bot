@@ -1,8 +1,8 @@
 import { kv } from "../mod.ts";
 
 export interface Profile {
-  name: string;
-  surname: string;
+  firstName: string;
+  lastName: string;
   isFree: boolean;
 }
 
@@ -13,20 +13,20 @@ export const getProfile = async (id: number) =>
 
 export const setProfile = async (
   id: number,
-  name: string,
-  surname: string,
+  firstName: string,
+  lastName: string,
   isFree: boolean,
 ) =>
   await kv.set(
     profileKey(id),
-    { name, surname, isFree } as Profile,
+    { firstName, lastName, isFree } as Profile,
   );
 
 export const removeProfile = async (id: number) =>
   await kv.delete(profileKey(id));
 
 export const sorting = (profile1: Profile, profile2: Profile) => {
-  return (profile1.surname != profile2.surname)
-    ? profile1.surname.localeCompare(profile2.surname)
-    : profile1.name.localeCompare(profile2.name);
+  return (profile1.lastName != profile2.lastName)
+    ? profile1.lastName.localeCompare(profile2.lastName)
+    : profile1.firstName.localeCompare(profile2.firstName);
 };
