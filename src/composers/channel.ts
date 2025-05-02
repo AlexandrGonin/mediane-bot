@@ -15,19 +15,19 @@ const check = async (ctx: Context) =>
   ctx.chat?.type == "channel" &&
   (await checkChannel(ctx.chat.id));
 
-channelComposer.filter(check).command("post", async (c) => {
-  const delayToClose = 3 * 60 * 60 * 1000;
+channelComposer.filter(check).command("post", async (ctx) => {
+  const delay = 3 * 60 * 60 * 1000;
 
   const now = new Date();
-  await setPost(c.chatId, now, c.msgId);
-  await requestPostClose(c.chatId, now, delayToClose);
+  await setPost(ctx.chatId, now, ctx.msgId);
+  await requestPostClose(ctx.chatId, now, delay);
 
   const reply_markup = new InlineKeyboard()
     .url(
       "Запись в боте",
-      `https://t.me/${bot.botInfo.username}?start=${c.chatId}`,
+      `https://t.me/${bot.botInfo.username}?start=${ctx.chatId}`,
     );
-  await c.editMessageText(await generatePostText(c.chatId, new Date()), {
+  await ctx.editMessageText(await generatePostText(ctx.chatId, new Date()), {
     reply_markup,
     parse_mode: "HTML",
   });
