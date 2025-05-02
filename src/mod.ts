@@ -1,5 +1,4 @@
-import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
-import { freeStorage } from "https://deno.land/x/grammy_storages@v2.4.2/free/src/mod.ts";
+import { Bot, Context, InlineKeyboard } from "grammy";
 import { entryComposer } from "./composers/entry.ts";
 import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { registryComposer } from "./composers/registry.ts";
@@ -12,30 +11,18 @@ import {
   setPost,
 } from "./db/channel.ts";
 import { utilComposer } from "./composers/util.ts";
+import { ConversationFlavor, conversations } from "grammy/conversations";
 
-export interface SessionData {
-  registryStatus?: "name" | "surname" | "paid";
-  name?: string;
-  surname?: string;
-}
-
-export type BotContext = Context & SessionFlavor<SessionData>;
+export type BotContext = ConversationFlavor<Context>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
 export const adminId = Number(Deno.env.get("ADMIN_ID") || "");
 
-bot.use(
-  session({
-    initial: () => ({}),
-    storage: freeStorage<SessionData>(bot.token),
-  }),
-);
+bot.use(conversations());
 
 bot.command("cancel", async (ctx) => {
-  ctx.session.registryStatus = undefined;
-  ctx.session.name = undefined;
-  ctx.session.surname = undefined;
+  await ctx.conversation.exitAll();
   await ctx.reply("Действие отменено.");
 });
 
@@ -49,29 +36,12 @@ bot.callbackQuery(
     }),
 );
 
-// post closing
-export const closePost = async (value: { channelId: number; date: Date }) => {
-  const { channelId, date } = value;
-  if (!channelId || !date) return;
-
-  const post = await getPost(channelId, date);
-  if (!post) return;
-  const adminId = await getAdmin(channelId);
-  if (adminId) {
-    await bot.api.forwardMessage(adminId, channelId, post);
-  }
-
-  const reply_markup = new InlineKeyboard().text("🔒 Запись закрыта", "closed");
-  await bot.api.editMessageReplyMarkup(channelId, post, { reply_markup });
-
-  await deletePost(channelId, date);
-};
-
 bot.use(utilComposer);
 bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
 
+// post opening
 Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
   const delay = 3 * 60 * 60 * 1000;
   const botName = (await bot.api.getMe()).username;
@@ -96,6 +66,24 @@ Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
     }
   }
 });
+
+// post closing
+export const closePost = async (value: { channelId: number; date: Date }) => {
+  const { channelId, date } = value;
+  if (!channelId || !date) return;
+
+  const post = await getPost(channelId, date);
+  if (!post) return;
+  const adminId = await getAdmin(channelId);
+  if (adminId) {
+    await bot.api.forwardMessage(adminId, channelId, post);
+  }
+
+  const reply_markup = new InlineKeyboard().text("🔒 Запись закрыта", "closed");
+  await bot.api.editMessageReplyMarkup(channelId, post, { reply_markup });
+
+  await deletePost(channelId, date);
+};
 
 kv.listenQueue(closePost);
 
