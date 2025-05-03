@@ -1,7 +1,9 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
-import { entryComposer } from "./composers/entry.ts";
+import { ConversationFlavor, conversations } from "grammy/conversations";
 import { channelComposer, generatePostText } from "./composers/channel.ts";
+import { entryComposer } from "./composers/entry.ts";
 import { registryComposer } from "./composers/registry.ts";
+import { utilComposer } from "./composers/util.ts";
 import {
   deletePost,
   getAdmin,
@@ -10,8 +12,6 @@ import {
   requestPostClose,
   setPost,
 } from "./db/channel.ts";
-import { utilComposer } from "./composers/util.ts";
-import { ConversationFlavor, conversations } from "grammy/conversations";
 
 export type BotContext = ConversationFlavor<Context>;
 

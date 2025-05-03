@@ -38,6 +38,11 @@ const register = async (convo: Conversation, ctx: Context) => {
     { reply_markup: confirmMarkup },
   );
   const confirmCtx = await convo.waitForCallbackQuery(["ok", "back"]);
+  confirmCtx.editMessageText(
+    `${confirmCtx.msg?.text}\n\n${
+      confirmCtx.callbackQuery.data == "ok" ? "Правильно" : "Неправильно"
+    }`,
+  );
   if (confirmCtx.callbackQuery.data == "ok") {
     await setProfile(confirmCtx.from.id, name, surname, free);
     await confirmCtx.reply("Профиль создан!");
