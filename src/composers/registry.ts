@@ -34,29 +34,15 @@ registryComposer.chatType("private")
 // if free cafeteria
 registryComposer.chatType("private")
   .filter((ctx) => checkStatus(ctx, "paid"))
-  .callbackQuery("yes", async (ctx) => {
+  .callbackQuery(["yes", "no"], async (ctx) => {
     ctx.session.registryStatus = undefined;
     await setProfile(
       ctx.from.id,
       ctx.session.name || "",
       ctx.session.surname || "",
-      true,
+      ctx.callbackQuery.data == "yes",
     );
     await ctx.editMessageText(ctx.msg?.text + `\n\nДа ✅`);
-    await ctx.reply("Сделано!");
-  });
-// if paid cafeteria
-registryComposer.chatType("private")
-  .filter((ctx) => checkStatus(ctx, "paid"))
-  .callbackQuery("no", async (ctx) => {
-    ctx.session.registryStatus = undefined;
-    await setProfile(
-      ctx.from.id,
-      ctx.session.name || "",
-      ctx.session.surname || "",
-      false,
-    );
-    await ctx.editMessageText(ctx.msg?.text + `\n\nНет ❌`);
     await ctx.reply("Сделано!");
   });
 

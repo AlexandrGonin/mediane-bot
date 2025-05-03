@@ -1,5 +1,5 @@
 import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
-import { freeStorage } from "https://deno.land/x/grammy_storages@v2.4.2/free/src/mod.ts";
+import { freeStorage } from "grammy/storages";
 import { entryComposer } from "./composers/entry.ts";
 import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { registryComposer } from "./composers/registry.ts";
