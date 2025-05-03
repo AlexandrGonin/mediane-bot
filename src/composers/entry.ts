@@ -77,8 +77,16 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
     });
     return;
   }
-  const entry = await getEntry(channelId, ctx.from.id, new Date());
 
+  const profile = await getProfile(ctx.from.id); // 5. Check if the profile is there
+  if (!profile) {
+    await ctx.reply(
+      "Ты не зарегистрирован в системе! Обратись к @constant0fps",
+    );
+    return;
+  }
+
+  const entry = await getEntry(channelId, ctx.from.id, new Date());
   await addEntry(channelId, ctx.from.id, new Date());
 
   const reply_markup = new InlineKeyboard().text(
@@ -126,8 +134,16 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
     });
     return;
   }
-  const entry = await getEntry(channelId, ctx.from.id, new Date());
 
+  const profile = await getProfile(ctx.from.id); // 5. Check if the profile is there
+  if (!profile) {
+    await ctx.reply(
+      "Ты не зарегистрирован в системе! Обратись к @constant0fps",
+    );
+    return;
+  }
+
+  const entry = await getEntry(channelId, ctx.from.id, new Date());
   await removeEntry(channelId, ctx.from.id, new Date());
 
   const reply_markup = new InlineKeyboard().text(
