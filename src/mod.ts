@@ -36,7 +36,7 @@ bot.callbackQuery(
     }),
 );
 
-bot.commamd("stop", async (ctx) => {
+bot.command("stop", async (ctx) => {
   await kv.set(["open"], false);
 });
 
