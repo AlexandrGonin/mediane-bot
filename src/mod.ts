@@ -36,6 +36,10 @@ bot.callbackQuery(
     }),
 );
 
+bot.commamd("stop", async (ctx) => {
+  await kv.set(["open"], false);
+});
+
 bot.use(utilComposer);
 bot.use(registryComposer);
 bot.use(entryComposer);
@@ -43,6 +47,8 @@ bot.use(channelComposer);
 
 // post opening
 Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
+  const open = (await kv.get<boolean>(["open"])).value;
+  if (!open) return;
   const delay = 3 * 60 * 60 * 1000;
   const botName = (await bot.api.getMe()).username;
 
