@@ -37,7 +37,7 @@ bot.callbackQuery(
 );
 
 bot.command("stop", async (ctx) => {
-  await kv.set(["open"], false);
+  await kv.set(["open"], true);
 });
 
 bot.use(utilComposer);
