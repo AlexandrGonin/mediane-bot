@@ -38,6 +38,12 @@ bot.callbackQuery(
 
 bot.command("stop", async (ctx) => {
   await kv.set(["open"], false);
+  await ctx.reply("closed");
+});
+
+bot.chatType("private").command("open", async (ctx) => {
+  await kv.set(["open"], true);
+  await ctx.reply("open");
 });
 
 bot.use(utilComposer);
@@ -46,7 +52,7 @@ bot.use(entryComposer);
 bot.use(channelComposer);
 
 // post opening
-Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
+Deno.cron("daily entry", "0 7 * * MON-SAT", async () => {
   const open = (await kv.get<boolean>(["open"])).value;
   if (!open) return;
   const delay = 3 * 60 * 60 * 1000;
