@@ -1,63 +1,76 @@
-import { Composer, Context, InlineKeyboard } from "grammy";
-import { getProfile, setProfile } from "../db/profile.ts";
+import { Composer, InlineKeyboard } from "grammy";
 import { BotContext } from "../mod.ts";
-import { Conversation, createConversation } from "grammy/conversations";
+import { getProfile, setProfile } from "../db/profile.ts";
 
 export const registryComposer = new Composer<BotContext>();
 
-const register = async (convo: Conversation, ctx: Context) => {
-  await ctx.reply("Напиши свое имя");
-  const nameCtx = await convo.waitFor("message:text");
-  const name = nameCtx.msg.text;
-
-  await nameCtx.reply("Теперь фамилию");
-  const surnameCtx = await convo.waitFor("message:text");
-  const surname = surnameCtx.msg.text;
-
-  const reply_markup = new InlineKeyboard()
-    .text("Да ✅", "yes")
-    .text("Нет ❌", "no");
-  await surnameCtx.reply("Ты бесплатник?", { reply_markup });
-  const paidCtx = await convo.waitForCallbackQuery(["yes", "no"]);
-  const free = paidCtx.callbackQuery.data == "yes";
-  await paidCtx.editMessageText(
-    `Ты бесплатник?\n\n${free ? "Да ✅" : "Нет ❌"}`,
-  );
-
-  const confirmMarkup = new InlineKeyboard()
-    .text("Правильно", "ok")
-    .row()
-    .text("Неправильно", "back");
-  await ctx.reply(
-    `
-Проверь то, что я получил:
-Имя: ${nameCtx.msg.text},
-Фамилия: ${surnameCtx.msg.text},
-Бесплатник: ${free ? "Да ✅" : "Нет ❌"}
-`,
-    { reply_markup: confirmMarkup },
-  );
-  const confirmCtx = await convo.waitForCallbackQuery(["ok", "back"]);
-  confirmCtx.editMessageText(
-    `${confirmCtx.msg?.text}\n\n${
-      confirmCtx.callbackQuery.data == "ok" ? "Правильно" : "Неправильно"
-    }`,
-  );
-  if (confirmCtx.callbackQuery.data == "ok") {
-    await setProfile(confirmCtx.from.id, name, surname, free);
-    await confirmCtx.reply("Профиль создан!");
-  } else {
-    await confirmCtx.reply("Попробуй еще раз через /register");
-  }
-};
-
-registryComposer.use(createConversation(register));
-
 registryComposer.chatType("private").command("register", async (ctx) => {
   const profile = await getProfile(ctx.from.id);
-  if (profile) {
-    await ctx.reply("Ты уже зарегистрирован");
+  if (profile != null) {
+    await ctx.reply("Ты уже зарегестрирован!");
     return;
   }
-  await ctx.conversation.enter("register");
+  ctx.session.registryStatus = "name";
+  await ctx.reply("Напиши свое имя");
 });
+
+registryComposer.chatType("private")
+  .filter((ctx) => checkStatus(ctx, "name"))
+  .on("msg:text", async (ctx) => {
+    ctx.session.name = ctx.msg.text;
+    ctx.session.registryStatus = "surname";
+    await ctx.reply("Теперь напиши свою фамилию");
+  });
+
+registryComposer.chatType("private")
+  .filter((ctx) => checkStatus(ctx, "surname"))
+  .on("msg:text", async (ctx) => {
+    ctx.session.surname = ctx.msg.text;
+
+    const reply_markup = new InlineKeyboard();
+    reply_markup.text("Да", "yes").text("Нет", "no");
+
+    ctx.session.registryStatus = "paid";
+    await ctx.reply("Ты бесплатник?", { reply_markup });
+  });
+
+registryComposer.chatType("private")
+  .filter((ctx) => checkStatus(ctx, "paid"))
+  .callbackQuery(/(yes)|(no)/, async (ctx) => {
+    ctx.session.isFree = ctx.callbackQuery.data == "yes";
+    ctx.session.registryStatus = "check";
+    const reply_markup = new InlineKeyboard();
+    reply_markup.text("Правильно", "yes").text("Неправильно", "no");
+    await ctx.reply(
+      `Проверь то что я получил:\nИмя: ${ctx.session.name}\nФамилия: ${ctx.session.surname}\nБесплатник: ${
+        ctx.session.isFree ? "Да" : "Нет"
+      }`,
+      { reply_markup },
+    );
+  });
+
+registryComposer.chatType("private")
+  .filter((ctx) => checkStatus(ctx, "check"))
+  .callbackQuery(/(yes)|(no)/, async (ctx) => {
+    if (ctx.callbackQuery.data == "yes") {
+      await setProfile(
+        ctx.from.id,
+        ctx.session.name || "",
+        ctx.session.surname || "",
+        ctx.session.isFree || false,
+      );
+      await ctx.reply("Профиль создан");
+    }
+    ctx.session.name = undefined;
+    ctx.session.surname = undefined;
+    ctx.session.isFree = undefined;
+    ctx.session.registryStatus = undefined;
+    if (ctx.callbackQuery.data == "no") {
+      await ctx.reply("Попробуй еще раз через /register");
+    }
+  });
+
+const checkStatus = (
+  ctx: BotContext,
+  status: "name" | "surname" | "paid" | "check",
+) => ctx.session.registryStatus == status;

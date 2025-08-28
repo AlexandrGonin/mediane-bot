@@ -1,5 +1,5 @@
-import { Bot, Context, InlineKeyboard } from "grammy";
-import { ConversationFlavor, conversations } from "grammy/conversations";
+import { DenoKVAdapter } from "storage";
+import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
 import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { entryComposer } from "./composers/entry.ts";
 import { registryComposer } from "./composers/registry.ts";
@@ -13,16 +13,28 @@ import {
   setPost,
 } from "./db/channel.ts";
 
-export type BotContext = ConversationFlavor<Context>;
+export interface SessionData {
+  registryStatus?: "name" | "surname" | "paid" | "check";
+  name?: string;
+  surname?: string;
+  isFree?: boolean;
+}
+
+export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
-export const adminId = Number(Deno.env.get("ADMIN_ID") || "");
 
-bot.use(conversations());
+bot.use(session({
+  initial: () => ({}),
+  storage: new DenoKVAdapter(kv),
+}));
 
 bot.command("cancel", async (ctx) => {
-  await ctx.conversation.exitAll();
+  ctx.session.name = undefined;
+  ctx.session.surname = undefined;
+  ctx.session.isFree = undefined;
+  ctx.session.registryStatus = undefined;
   await ctx.reply("Действие отменено.");
 });
 
@@ -36,7 +48,7 @@ bot.callbackQuery(
     }),
 );
 
-bot.command("stop", async (ctx) => {
+bot.chatType("private").command("stop", async (ctx) => {
   await kv.set(["open"], false);
   await ctx.reply("closed");
 });
@@ -52,7 +64,7 @@ bot.use(entryComposer);
 bot.use(channelComposer);
 
 // post opening
-Deno.cron("daily entry", "0 7 * * MON-SAT", async () => {
+Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
   const open = (await kv.get<boolean>(["open"])).value;
   if (!open) return;
   const delay = 3 * 60 * 60 * 1000;

@@ -7,7 +7,7 @@
     "@std/dotenv": "jsr:@std/dotenv@^0.225.3",
     "grammy": "https://deno.land/x/grammy@v1.36.1/mod.ts",
     "grammy/conversations": "https://deno.land/x/grammy_conversations@v2.1.0/mod.ts",
-    "nanoid": "https://deno.land/x/nanoid/mod.ts"
+    "storage": "https://deno.land/x/grammy_storages/denokv/src/mod.ts"
   },
   "unstable": ["kv", "cron"]
 }

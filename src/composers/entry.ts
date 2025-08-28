@@ -8,7 +8,10 @@ export const entryComposer = new Composer();
 
 entryComposer.chatType("private").command("start", async (ctx) => {
   const channelId = Number(ctx.match);
-  if (!channelId) return; // 1. Check if channel id is provided
+  if (!channelId) {
+    await ctx.reply("Услышал тебя родной, приходи когда будет запись :)");
+    return;
+  } // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
 
@@ -19,7 +22,7 @@ entryComposer.chatType("private").command("start", async (ctx) => {
   const profile = await getProfile(ctx.from.id);
   if (!profile) {
     await ctx.reply(
-      "Ты не зарегистрирован в системе! Обратись к @constant0fps",
+      "Ты не зарегистрирован в системе! Зарегистрируйся через /register",
     );
     return;
   }
@@ -55,7 +58,10 @@ entryComposer.chatType("private").command("start", async (ctx) => {
 
 entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
   const channelId = Number(ctx.callbackQuery.data.split(":")[1]);
-  if (!channelId) return; // 1. Check if channel id is provided
+  if (!channelId) {
+    await ctx.reply("Услышал тебя родной, приходи когда будет запись :)");
+    return;
+  } // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
 
@@ -81,7 +87,7 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
   const profile = await getProfile(ctx.from.id); // 5. Check if the profile is there
   if (!profile) {
     await ctx.reply(
-      "Ты не зарегистрирован в системе! Обратись к @constant0fps",
+      "Ты не зарегистрирован в системе! Зарегистрируйся через /register",
     );
     return;
   }
@@ -112,7 +118,10 @@ entryComposer.chatType("private").callbackQuery(/add:.*/, async (ctx) => {
 
 entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
   const channelId = Number(ctx.callbackQuery.data.split(":")[1]);
-  if (!channelId) return; // 1. Check if channel id is provided
+  if (!channelId) {
+    await ctx.reply("Услышал тебя родной, приходи когда будет запись :)");
+    return;
+  } // 1. Check if channel id is provided
 
   if (!(await checkChannel(channelId))) return; // 2. Check if channel is allowed
 
@@ -138,7 +147,7 @@ entryComposer.chatType("private").callbackQuery(/remove:.*/, async (ctx) => {
   const profile = await getProfile(ctx.from.id); // 5. Check if the profile is there
   if (!profile) {
     await ctx.reply(
-      "Ты не зарегистрирован в системе! Обратись к @constant0fps",
+      "Ты не зарегистрирован в системе! Зарегистрируйся через /register",
     );
     return;
   }
