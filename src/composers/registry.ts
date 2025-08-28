@@ -38,6 +38,9 @@ registryComposer.chatType("private")
   .filter((ctx) => checkStatus(ctx, "paid"))
   .callbackQuery(/(yes)|(no)/, async (ctx) => {
     ctx.session.isFree = ctx.callbackQuery.data == "yes";
+    await ctx.editMessageText(
+      ctx.msg?.text + `\n\n${ctx.session.isFree ? "Да" : "Нет"}`,
+    );
     ctx.session.registryStatus = "check";
     const reply_markup = new InlineKeyboard();
     reply_markup.text("Правильно", "yes").text("Неправильно", "no");
@@ -52,6 +55,10 @@ registryComposer.chatType("private")
 registryComposer.chatType("private")
   .filter((ctx) => checkStatus(ctx, "check"))
   .callbackQuery(/(yes)|(no)/, async (ctx) => {
+    await ctx.editMessageText(
+      ctx.msg?.text +
+        `\n\n${ctx.callbackQuery.data == "yes" ? "Правильно" : "Неправильно"}`,
+    );
     if (ctx.callbackQuery.data == "yes") {
       await setProfile(
         ctx.from.id,
