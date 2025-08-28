@@ -2,9 +2,15 @@ import { Composer } from "grammy";
 import { setAdmin, setChannel } from "../db/channel.ts";
 import { monthAsText } from "../db/offload.ts";
 import { closePost } from "../mod.ts";
+import { removeProfile } from "../db/profile.ts";
 
 export const utilComposer = new Composer();
 
+utilComposer.chatType("private").command("remove", async (ctx) => {
+  const userId = ctx.from.id;
+  await removeProfile(userId);
+  await ctx.reply("Removed your profile");
+});
 // get data for this month
 utilComposer.chatType("private").command("data", async (ctx) => {
   const channelId = Number(ctx.match);
