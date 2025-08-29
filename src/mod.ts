@@ -18,6 +18,8 @@ export interface SessionData {
   name?: string;
   surname?: string;
   isFree?: boolean;
+  cardId?: number;
+  guidanceId?: number;
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;
@@ -31,10 +33,7 @@ bot.use(session({
 }));
 
 bot.command("cancel", async (ctx) => {
-  ctx.session.name = undefined;
-  ctx.session.surname = undefined;
-  ctx.session.isFree = undefined;
-  ctx.session.registryStatus = undefined;
+  ctx.session = {};
   await ctx.reply("Действие отменено.");
 });
 

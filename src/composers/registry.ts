@@ -1,80 +1,122 @@
 import { Composer, InlineKeyboard } from "grammy";
 import { BotContext } from "../mod.ts";
-import { getProfile, setProfile } from "../db/profile.ts";
+import { setProfile } from "../db/profile.ts";
 
 export const registryComposer = new Composer<BotContext>();
+const header = "Регистрация:\n";
+const name = "\nИмя: ";
+const surname = "\nФамилия: ";
+const free = "\nБесплатник: ";
+const footer = "\n\nВсе правильно?";
+
+const generateText = (ctx: BotContext) =>
+  header +
+  name +
+  (ctx.session.name || (ctx.session.registryStatus == "name" ? "___" : "-")) +
+  surname +
+  (ctx.session.surname ||
+    (ctx.session.registryStatus == "surname" ? "___" : "-")) +
+  free +
+  (ctx.session.isFree == undefined
+    ? (ctx.session.registryStatus == "paid" ? "___" : "-")
+    : (ctx.session.isFree ? "✅" : "❌")) +
+  (ctx.session.registryStatus == "check" ? footer : "");
 
 registryComposer.chatType("private").command("register", async (ctx) => {
-  const profile = await getProfile(ctx.from.id);
-  if (profile != null) {
-    await ctx.reply("Ты уже зарегестрирован!");
-    return;
-  }
   ctx.session.registryStatus = "name";
-  await ctx.reply("Напиши свое имя");
+
+  // create registry card
+  const registrationMsg = await ctx.reply(generateText(ctx));
+  ctx.session.cardId = registrationMsg.message_id;
+
+  // create guidance
+  const nameMsg = await ctx.reply("Напиши свое имя");
+  ctx.session.guidanceId = nameMsg.message_id;
 });
 
-registryComposer.chatType("private")
-  .filter((ctx) => checkStatus(ctx, "name"))
-  .on("msg:text", async (ctx) => {
+registryComposer.chatType("private").filter((ctx) => checkStatus(ctx, "name"))
+  .on("message:text", async (ctx) => {
     ctx.session.name = ctx.msg.text;
     ctx.session.registryStatus = "surname";
-    await ctx.reply("Теперь напиши свою фамилию");
-  });
+    await ctx.deleteMessage();
 
-registryComposer.chatType("private")
-  .filter((ctx) => checkStatus(ctx, "surname"))
-  .on("msg:text", async (ctx) => {
-    ctx.session.surname = ctx.msg.text;
-
-    const reply_markup = new InlineKeyboard();
-    reply_markup.text("Да", "yes").text("Нет", "no");
-
-    ctx.session.registryStatus = "paid";
-    await ctx.reply("Ты бесплатник?", { reply_markup });
-  });
-
-registryComposer.chatType("private")
-  .filter((ctx) => checkStatus(ctx, "paid"))
-  .callbackQuery(/(yes)|(no)/, async (ctx) => {
-    ctx.session.isFree = ctx.callbackQuery.data == "yes";
-    await ctx.editMessageText(
-      ctx.msg?.text + `\n\n${ctx.session.isFree ? "Да" : "Нет"}`,
+    // edit card
+    await ctx.api.editMessageText(
+      ctx.chat.id,
+      ctx.session.cardId || -1,
+      generateText(ctx),
     );
-    ctx.session.registryStatus = "check";
+
+    // edit guidance
+    if (ctx.session.guidanceId) {
+      await ctx.api.deleteMessage(ctx.chat.id, ctx.session.guidanceId);
+    }
+    const surnameMsg = await ctx.reply("Теперь напиши свою фамилию");
+    ctx.session.guidanceId = surnameMsg.message_id;
+  });
+
+registryComposer.chatType("private").filter((ctx) =>
+  checkStatus(ctx, "surname")
+)
+  .on("message:text", async (ctx) => {
+    ctx.session.surname = ctx.msg.text;
+    ctx.session.registryStatus = "paid";
+
+    // remove guidance
+    if (ctx.session.guidanceId) {
+      await ctx.api.deleteMessage(ctx.chat.id, ctx.session.guidanceId);
+    }
+    await ctx.deleteMessage();
+
+    // edit card
     const reply_markup = new InlineKeyboard();
-    reply_markup.text("Правильно", "yes").text("Неправильно", "no");
-    await ctx.reply(
-      `Проверь то что я получил:\nИмя: ${ctx.session.name}\nФамилия: ${ctx.session.surname}\nБесплатник: ${
-        ctx.session.isFree ? "Да" : "Нет"
-      }`,
+    reply_markup.text("Я бесплатник✅", "yes").text("Я не бесплатник❌", "no");
+    await ctx.api.editMessageText(
+      ctx.chat.id,
+      ctx.session.cardId || -1,
+      generateText(ctx),
       { reply_markup },
     );
   });
 
-registryComposer.chatType("private")
-  .filter((ctx) => checkStatus(ctx, "check"))
+registryComposer.chatType("private").filter((ctx) => checkStatus(ctx, "paid"))
   .callbackQuery(/(yes)|(no)/, async (ctx) => {
+    ctx.session.isFree = ctx.callbackQuery.data == "yes";
+    ctx.session.registryStatus = "check";
+
+    // edit card
+    const reply_markup = new InlineKeyboard();
+    reply_markup
+      .text("Все правильно✅", "yes")
+      .text("Нет, нужно исправить❌", "no");
     await ctx.editMessageText(
-      ctx.msg?.text +
-        `\n\n${ctx.callbackQuery.data == "yes" ? "Правильно" : "Неправильно"}`,
+      generateText(ctx),
+      { reply_markup },
     );
-    if (ctx.callbackQuery.data == "yes") {
+  });
+
+registryComposer.chatType("private").filter((ctx) => checkStatus(ctx, "check"))
+  .callbackQuery(/(yes)|(no)/, async (ctx) => {
+    ctx.session.registryStatus = undefined;
+    const right = ctx.callbackQuery.data == "yes";
+
+    await ctx.editMessageText(
+      generateText(ctx) + (right ? "\n\nПравильно✅" : "\n\nНе правильно❌"),
+    );
+
+    if (right) {
       await setProfile(
         ctx.from.id,
-        ctx.session.name || "",
-        ctx.session.surname || "",
+        ctx.session.name || "N",
+        ctx.session.surname || "N",
         ctx.session.isFree || false,
       );
       await ctx.reply("Профиль создан");
+    } else {
+      ctx.reply("Попробуй еще раз через /register");
     }
-    ctx.session.name = undefined;
-    ctx.session.surname = undefined;
-    ctx.session.isFree = undefined;
-    ctx.session.registryStatus = undefined;
-    if (ctx.callbackQuery.data == "no") {
-      await ctx.reply("Попробуй еще раз через /register");
-    }
+
+    ctx.session = {};
   });
 
 const checkStatus = (
