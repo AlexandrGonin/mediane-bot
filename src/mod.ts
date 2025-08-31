@@ -13,13 +13,17 @@ import {
   setPost,
 } from "./db/channel.ts";
 
+export enum RegStatus {
+  name,
+  surname,
+}
+
 export interface SessionData {
-  registryStatus?: "name" | "surname" | "paid" | "check";
+  status?: RegStatus;
   name?: string;
   surname?: string;
   isFree?: boolean;
   cardId?: number;
-  guidanceId?: number;
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;
