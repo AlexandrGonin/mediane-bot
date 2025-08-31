@@ -122,6 +122,7 @@ registryComposer.chatType("private").callbackQuery("check", async (ctx) => {
 });
 
 registryComposer.chatType("private").callbackQuery("confirm", async (ctx) => {
+  await ctx.editMessageText(ctx.msg?.text || "");
   await setProfile(
     ctx.from.id,
     ctx.session.name || "N",
