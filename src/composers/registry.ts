@@ -122,14 +122,20 @@ registryComposer.chatType("private").callbackQuery("check", async (ctx) => {
 });
 
 registryComposer.chatType("private").callbackQuery("confirm", async (ctx) => {
-  await ctx.editMessageText(ctx.msg?.text || "");
-  await setProfile(
-    ctx.from.id,
-    ctx.session.name || "N",
-    ctx.session.surname || "N",
-    ctx.session.isFree || false,
-  );
-  await ctx.reply("Профиль создан");
+  await ctx.editMessageReplyMarkup();
+  if (
+    ctx.session.name && ctx.session.surname && ctx.session.isFree != undefined
+  ) {
+    await setProfile(
+      ctx.from.id,
+      ctx.session.name,
+      ctx.session.surname,
+      ctx.session.isFree,
+    );
+    await ctx.reply("Профиль создан");
+  } else {
+    await ctx.reply("Недостаточно данных");
+  }
   ctx.session = {};
 });
 
