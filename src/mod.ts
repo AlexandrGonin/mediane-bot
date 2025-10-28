@@ -4,14 +4,8 @@ import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { entryComposer } from "./composers/entry.ts";
 import { registryComposer } from "./composers/registry.ts";
 import { utilComposer } from "./composers/util.ts";
-import {
-  deletePost,
-  getAdmin,
-  getPost,
-  listChannels,
-  requestPostClose,
-  setPost,
-} from "./db/channel.ts";
+import { getAdmin, listChannels, requestPostClose } from "./db/channel.ts";
+import { deletePost, getPost, Post, setPost } from "./db/post.ts";
 
 export enum RegStatus {
   name,
@@ -80,36 +74,47 @@ Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
       `https://t.me/${botName}?start=${channel.id}`,
     );
     try {
-      const post = await bot.api.sendMessage(
-        channel.id,
-        await generatePostText(channel.id, now),
-        { reply_markup, parse_mode: "HTML" },
+      const post = await bot.api.sendMessage(channel.id, "post");
+      const postId = await setPost(
+        {
+          channel_id: channel.id,
+          message_id: post.message_id,
+          name: `на ${
+            now.toLocaleDateString("ru", { timeZone: "Asia/Yekaterinburg" })
+          }`,
+          date: now,
+        } as Post,
       );
-
-      await setPost(channel.id, now, post.message_id);
-      await requestPostClose(channel.id, now, delay);
+      await bot.api.editMessageText(
+        channel.id,
+        post.message_id,
+        await generatePostText(postId),
+        { reply_markup },
+      );
+      await requestPostClose(postId, delay);
     } catch {
-      console.error("Could not send message to allowed, channel, continuing");
+      console.error(
+        `Could not send message to allowed channel ${channel.id}, continuing`,
+      );
     }
   }
 });
 
 // post closing
-export const closePost = async (value: { channelId: number; date: Date }) => {
-  const { channelId, date } = value;
-  if (!channelId || !date) return;
-
-  const post = await getPost(channelId, date);
+export const closePost = async (postId: string) => {
+  const post = await getPost(postId);
   if (!post) return;
-  const adminId = await getAdmin(channelId);
+  const adminId = await getAdmin(post.channel_id);
   if (adminId) {
-    await bot.api.forwardMessage(adminId, channelId, post);
+    await bot.api.forwardMessage(adminId, post.channel_id, post.message_id);
   }
 
   const reply_markup = new InlineKeyboard().text("🔒 Запись закрыта", "closed");
-  await bot.api.editMessageReplyMarkup(channelId, post, { reply_markup });
+  await bot.api.editMessageReplyMarkup(post.channel_id, post.message_id, {
+    reply_markup,
+  });
 
-  await deletePost(channelId, date);
+  await deletePost(postId);
 };
 
 kv.listenQueue(closePost);

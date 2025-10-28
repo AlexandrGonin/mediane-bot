@@ -8,15 +8,6 @@ export const setChannel = async (id: number, allowed: boolean) =>
 export const checkChannel = async (id: number) =>
   (await kv.get<boolean>(channelKey(id))).value ? true : false;
 
-const postKey = (
-  channelId: number,
-  date: Date,
-) => [
-  "post",
-  channelId,
-  date.toLocaleDateString("ru", { timeZone: "Asia/Yekaterinburg" }),
-];
-
 export const listChannels = async () =>
   (await Array.fromAsync(
     kv.list<boolean>({ prefix: ["channel"] }),
@@ -26,23 +17,10 @@ export const listChannels = async () =>
     }),
   )).filter((c) => c.isAllowed);
 
-export const getPost = async (channelId: number, date: Date) =>
-  (await kv.get<number>(postKey(channelId, date))).value;
-
-export const setPost = async (
-  channelId: number,
-  date: Date,
-  messageId: number,
-) => await kv.set(postKey(channelId, date), messageId);
-
-export const deletePost = async (channelId: number, date: Date) =>
-  await kv.delete(postKey(channelId, date));
-
 export const requestPostClose = async (
-  channelId: number,
-  date: Date,
+  postId: string,
   delay: number,
-) => await kv.enqueue({ channelId, date }, { delay });
+) => await kv.enqueue(postId, { delay });
 
 export const adminKey = (channelId: number) => ["admin", channelId];
 

@@ -1,10 +1,6 @@
 import { Composer, Context, InlineKeyboard } from "grammy";
-import {
-  checkChannel,
-  getPost,
-  requestPostClose,
-  setPost,
-} from "../db/channel.ts";
+import { checkChannel, requestPostClose } from "../db/channel.ts";
+import { getPost, Post, setPost } from "../db/post.ts";
 import { bot } from "../mod.ts";
 import { listEntries } from "../db/entry.ts";
 import { sorting } from "../db/profile.ts";
@@ -19,39 +15,55 @@ channelComposer.filter(check).command("post", async (ctx) => {
   const delay = 3 * 60 * 60 * 1000;
 
   const now = new Date();
-  await setPost(ctx.chatId, now, ctx.msgId);
-  await requestPostClose(ctx.chatId, now, delay);
+  const postId = await setPost({
+    channel_id: ctx.chatId,
+    message_id: ctx.msgId,
+    name: ctx.match ||
+      now.toLocaleDateString(
+        "ru",
+        {
+          timeZone: "Asia/Yekaterinburg",
+          day: "2-digit",
+          month: "long",
+          weekday: "long",
+        },
+      ),
+    date: now,
+  } as Post);
+  await requestPostClose(postId, delay);
 
   const reply_markup = new InlineKeyboard()
     .url(
       "Запись в боте",
-      `https://t.me/${bot.botInfo.username}?start=${ctx.chatId}`,
+      `https://t.me/${bot.botInfo.username}?start=${postId}`,
     );
-  await ctx.editMessageText(await generatePostText(ctx.chatId, new Date()), {
+  await ctx.editMessageText(await generatePostText(postId), {
     reply_markup,
     parse_mode: "HTML",
   });
 });
 
-export const updatePost = async (channelId: number, date: Date) => {
-  const post = await getPost(channelId, date);
+export const updatePost = async (postId: string) => {
+  const post = await getPost(postId);
   if (!post) return;
 
   const reply_markup = new InlineKeyboard()
     .url(
       "Запись в боте",
-      `https://t.me/${bot.botInfo.username}?start=${channelId}`,
+      `https://t.me/${bot.botInfo.username}?start=${postId}`,
     );
   await bot.api.editMessageText(
-    channelId,
-    post,
-    await generatePostText(channelId, date),
+    post.channel_id,
+    post.message_id,
+    await generatePostText(postId),
     { reply_markup, parse_mode: "HTML" },
   );
 };
 
-export const generatePostText = async (channelId: number, date: Date) => {
-  const entries = await listEntries(channelId, date);
+export const generatePostText = async (postId: string) => {
+  const post = await getPost(postId);
+  if (!post) return "";
+  const entries = await listEntries(postId);
   const { free, paid } = Object.groupBy(
     entries,
     (profile) => profile.isFree ? "free" : "paid",
@@ -65,13 +77,7 @@ export const generatePostText = async (channelId: number, date: Date) => {
     .map((l) => l.map((p) => `${p.firstName} ${p.lastName}`).join("\n"))
     .join("\n");
 
-  const header = "<b>Столовая</b>\n" +
-    new Date().toLocaleDateString("ru", {
-      timeZone: "Asia/Yekaterinburg",
-      day: "2-digit",
-      month: "long",
-      weekday: "long",
-    });
+  const header = "<b>Столовая</b>\n" + post.name;
 
   const footer = `${free ? free.length : 0} беспл. + ${
     paid ? paid.length : 0

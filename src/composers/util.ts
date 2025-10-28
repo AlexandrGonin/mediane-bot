@@ -1,6 +1,5 @@
 import { Composer } from "grammy";
 import { setAdmin, setChannel } from "../db/channel.ts";
-import { monthAsText } from "../db/offload.ts";
 import { closePost } from "../mod.ts";
 import { removeProfile } from "../db/profile.ts";
 
@@ -11,16 +10,6 @@ utilComposer.chatType("private").command("remove", async (ctx) => {
   await removeProfile(userId);
   await ctx.reply("Removed your profile");
 });
-// get data for this month
-utilComposer.chatType("private").command("data", async (ctx) => {
-  const channelId = Number(ctx.match);
-  if (ctx.match) {
-    await ctx.reply(await monthAsText(channelId, (new Date()).getMonth()));
-  } else {
-    await ctx.react("🌚");
-  }
-});
-
 // add channel to approved list
 utilComposer.chatType("private").command("add", async (ctx) => {
   const channelId = Number(ctx.match);
@@ -43,17 +32,12 @@ utilComposer.chatType("private").command("set", async (ctx) => {
 });
 
 utilComposer.chatType("private").command("close", async (ctx) => {
-  const channelId = Number(ctx.match);
-  if (!channelId) {
+  const postId = ctx.match;
+  if (!postId) {
     await ctx.react("🌚");
     return;
   }
-  const chatMember = await ctx.api.getChatMember(channelId, ctx.from.id);
-  const allowedStatuses = ["creator", "administrator"];
-  if (!allowedStatuses.includes(chatMember.status)) {
-    await ctx.react("🤨");
-    return;
-  }
-  await closePost({ channelId, date: new Date() });
+
+  await closePost(postId);
   await ctx.react("👌");
 });
