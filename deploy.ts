@@ -13,6 +13,7 @@ app.post("/bot", async (req, res) => {
     console.log("handling");
     return await handleUpdate(req, res);
   } catch (error) {
+    console.log(error);
     res.status(500).send(`Internal server error: ${error}`);
   }
 });
