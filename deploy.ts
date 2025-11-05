@@ -6,6 +6,7 @@ import { bot } from "./src/mod.ts";
 
 const handleUpdate = webhookCallback(bot, "express");
 const app = express();
+app.use(express.json());
 const port = 1337;
 
 app.post("/bot", async (req, res) => {
