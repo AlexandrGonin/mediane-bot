@@ -20,7 +20,7 @@ app.post("/bot", async (req, res) => {
 app.all("/webhook", async (req, res) => {
   try {
     await bot.api.setWebhook(`https://${req.hostname}/bot`);
-    return res.status(201).send("webhook made");
+    return res.status(201).send(`webhook made at https://${req.hostname}/bot`);
   } catch (error) {
     res.status(500).send(`Internal server error: ${error}`);
   }
