@@ -4,11 +4,13 @@
     "start": "deno run -A --watch dev.ts"
   },
   "imports": {
-    "@std/dotenv": "jsr:@std/dotenv@^0.225.3",
-    "grammy": "https://deno.land/x/grammy@v1.36.1/mod.ts",
-    "grammy/conversations": "https://deno.land/x/grammy_conversations@v2.1.0/mod.ts",
+    "@std/dotenv": "jsr:@std/dotenv",
+    "@types/express": "npm:@types/express@^5.0.5",
+    "express": "npm:express@^5.1.0",
+    "grammy": "https://deno.land/x/grammy/mod.ts",
+    "grammy/conversations": "https://deno.land/x/grammy_conversations/mod.ts",
     "storage": "https://deno.land/x/grammy_storages/denokv/src/mod.ts",
-    "nanoid": "https://deno.land/x/nanoid@v3.0.0/mod.ts"
+    "nanoid": "https://deno.land/x/nanoid/mod.ts"
   },
   "unstable": ["kv", "cron"]
 }
