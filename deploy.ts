@@ -10,6 +10,7 @@ const port = 1337;
 
 app.post("/bot", async (req, res) => {
   try {
+    console.log("handling");
     return await handleUpdate(req, res);
   } catch (error) {
     res.status(500).send(`Internal server error: ${error}`);
