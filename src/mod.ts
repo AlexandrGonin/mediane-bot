@@ -69,10 +69,6 @@ Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
 
   for (const channel of await listChannels()) {
     const now = new Date();
-    const reply_markup = new InlineKeyboard().url(
-      "Запись в боте",
-      `https://t.me/${botName}?start=${channel.id}`,
-    );
     try {
       const post = await bot.api.sendMessage(channel.id, "post");
       const postId = await setPost(
@@ -85,11 +81,15 @@ Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
           date: now,
         } as Post,
       );
+      const reply_markup = new InlineKeyboard().url(
+        "Запись в боте",
+        `https://t.me/${botName}?start=${postId}`,
+      );
       await bot.api.editMessageText(
         channel.id,
         post.message_id,
         await generatePostText(postId),
-        { reply_markup },
+        { reply_markup, parse_mode: "HTML" },
       );
       await requestPostClose(postId, delay);
     } catch {
