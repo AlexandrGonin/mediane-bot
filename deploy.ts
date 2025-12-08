@@ -37,7 +37,7 @@ app.post("/auth", async (req, res) => {
     const token = await auth(req.body.initData as string);
     res.status(200).setHeader(
       "Access-Control-Allow-Origin",
-      "https://constant0fps-react-site.vercel.app",
+      "*",
     ).cookie("Authorization", token, { httpOnly: true });
   } catch (error) {
     res.status(400).send(error);
