@@ -31,7 +31,6 @@ channelComposer.filter(check).command("post", async (ctx) => {
     date: now,
   } as Post);
   await requestPostClose(postId, delay);
-
   const reply_markup = new InlineKeyboard()
     .url(
       "Запись в боте",
