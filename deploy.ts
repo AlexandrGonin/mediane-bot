@@ -29,16 +29,20 @@ app.all("/webhook", async (req, res) => {
   }
 });
 
+app.options("/auth", async (req, res) => {
+  res.status(200).setHeader(
+    "Access-Control-Allow-Origin",
+    "*",
+  );
+});
+
 app.post("/auth", async (req, res) => {
   if (!req.body.initData) {
     return res.status(400).send("No init data");
   }
   try {
     const token = await auth(req.body.initData as string);
-    res.status(200).setHeader(
-      "Access-Control-Allow-Origin",
-      "*",
-    ).cookie("Authorization", token, { httpOnly: true });
+    res.status(200).cookie("Authorization", token, { httpOnly: true });
   } catch (error) {
     res.status(400).send(error);
   }
