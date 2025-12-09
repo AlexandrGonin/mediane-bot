@@ -1,56 +1,28 @@
-//@ts-types="@types/express"
-import express from "express";
-
 import { webhookCallback } from "grammy";
 import { bot } from "./src/mod.ts";
-import { auth } from "./src/api/auth.ts";
 
-const handleUpdate = webhookCallback(bot, "express");
-const app = express();
-app.use(express.json());
-const port = 1337;
+const handleUpdate = webhookCallback(bot, "std/http");
 
-app.post("/bot", async (req, res) => {
-  try {
-    console.log("handling");
-    return await handleUpdate(req, res);
-  } catch (error) {
-    console.log(error);
-    res.status(500).send(`Internal server error: ${error}`);
+Deno.serve(async (req) => {
+  const url = new URL(req.url);
+  if (req.method == "POST") {
+    if (url.pathname == "/bot") {
+      try {
+        return await handleUpdate(req);
+      } catch (err) {
+        console.error(err);
+        return new Response("Nope, not working...");
+      }
+    }
+    return new Response("What you're trying to post?");
   }
-});
-
-app.all("/webhook", async (req, res) => {
-  try {
-    await bot.api.setWebhook(`https://${req.hostname}/bot`);
-    return res.status(201).send(`webhook made at https://${req.hostname}/bot`);
-  } catch (error) {
-    res.status(500).send(`Internal server error: ${error}`);
+  if (url.pathname == "/webhook") {
+    try {
+      await bot.api.setWebhook(`https://${url.hostname}/bot`);
+      return new Response("Done. Set");
+    } catch (_) {
+      return new Response("Couldn't succeed with installing webhook");
+    }
   }
+  return Response.redirect("https://t.me/constant0fps", 302);
 });
-
-app.options("/auth", async (req, res) => {
-  res.status(200).setHeader(
-    "Access-Control-Allow-Origin",
-    "*",
-  );
-});
-
-app.post("/auth", async (req, res) => {
-  if (!req.body.initData) {
-    return res.status(400).send("No init data");
-  }
-  try {
-    const token = await auth(req.body.initData as string);
-    res.status(200).cookie("Authorization", token, { httpOnly: true });
-  } catch (error) {
-    res.status(400).send(error);
-  }
-});
-
-app.listen(port, (err) => {
-  console.log("errors:", err);
-  console.log("server on port", port);
-});
-
-app.get("/", (_req, res) => res.redirect("https://t.me/constant0fps"));
