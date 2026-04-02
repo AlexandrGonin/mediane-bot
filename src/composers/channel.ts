@@ -3,7 +3,8 @@ import { checkChannel, requestPostClose } from "../db/channel.ts";
 import { getPost, Post, setPost } from "../db/post.ts";
 import { bot } from "../mod.ts";
 import { listEntries } from "../db/entry.ts";
-import { sorting } from "../db/profile.ts";
+import { getProfile, sorting } from "../db/profile.ts";
+import { getCurrentGroup, increaseOrder } from "../db/duty.ts";
 
 export const channelComposer = new Composer();
 
@@ -40,6 +41,14 @@ channelComposer.filter(check).command("post", async (ctx) => {
     reply_markup,
     parse_mode: "HTML",
   });
+});
+
+channelComposer.filter(check).command("duty", async (ctx) => {
+  const group = (await getCurrentGroup())?.members || []; 
+  await increaseOrder();
+  const profiles = (await Array.fromAsync(group.map(async (id) => await getProfile(id)))).filter((e) => e !== null);
+  const text = `Сегодня дежурят:\n${profiles.map((profile) => `${profile.firstName} ${profile.lastName}`).join('\n')}`
+  await ctx.editMessageText(text);
 });
 
 export const updatePost = async (postId: string) => {

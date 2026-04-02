@@ -1,7 +1,7 @@
 import { Composer } from "grammy";
-import { setAdmin, setChannel } from "../db/channel.ts";
-import { closePost } from "../mod.ts";
-import { removeProfile } from "../db/profile.ts";
+import { setAdmin, setChannel } from "../../db/channel.ts";
+import { closePost } from "../../mod.ts";
+import { removeProfile } from "../../db/profile.ts";
 
 export const utilComposer = new Composer();
 
@@ -10,6 +10,7 @@ utilComposer.chatType("private").command("remove", async (ctx) => {
   await removeProfile(userId);
   await ctx.reply("Removed your profile");
 });
+
 // add channel to approved list
 utilComposer.chatType("private").command("add", async (ctx) => {
   const channelId = Number(ctx.match);

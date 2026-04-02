@@ -3,9 +3,10 @@ import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
 import { channelComposer, generatePostText } from "./composers/channel.ts";
 import { entryComposer } from "./composers/entry.ts";
 import { registryComposer } from "./composers/registry.ts";
-import { utilComposer } from "./composers/util.ts";
+import { utilComposer } from "./composers/admin/util.ts";
 import { getAdmin, listChannels, requestPostClose } from "./db/channel.ts";
 import { deletePost, getPost, Post, setPost } from "./db/post.ts";
+import { keyboardComposer } from "./composers/admin/keyboard.ts";
 
 export enum RegStatus {
   name,
@@ -18,6 +19,8 @@ export interface SessionData {
   surname?: string;
   isFree?: boolean;
   cardId?: number;
+  schedule?: number[][];
+  action?: string
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;
@@ -55,6 +58,7 @@ bot.chatType("private").command("open", async (ctx) => {
   await ctx.reply("open");
 });
 
+bot.use(keyboardComposer);
 bot.use(utilComposer);
 bot.use(registryComposer);
 bot.use(entryComposer);
