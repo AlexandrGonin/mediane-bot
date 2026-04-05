@@ -28,7 +28,7 @@ export interface SessionData {
 export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
-export const kv = await Deno.openKv("https://api.deno.com/databases/6b8b2833-5f99-4c8b-bf83-9e168065b979/connect");;
+export const kv = await Deno.openKv();
 
 bot.use(session({
   initial: () => ({}),
