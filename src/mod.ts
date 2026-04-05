@@ -7,6 +7,8 @@ import { utilComposer } from "./composers/admin/util.ts";
 import { getAdmin, listChannels, requestPostClose } from "./db/channel.ts";
 import { deletePost, getPost, Post, setPost } from "./db/post.ts";
 import { keyboardComposer } from "./composers/admin/keyboard.ts";
+import { getCurrentGroup, increaseOrder } from "./db/duty.ts";
+import { getProfile } from "./db/profile.ts";
 
 export enum RegStatus {
   name,
@@ -26,7 +28,7 @@ export interface SessionData {
 export type BotContext = Context & SessionFlavor<SessionData>;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
-export const kv = await Deno.openKv();
+export const kv = await Deno.openKv("https://api.deno.com/databases/6b8b2833-5f99-4c8b-bf83-9e168065b979/connect");;
 
 bot.use(session({
   initial: () => ({}),
@@ -70,10 +72,15 @@ Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
   if (!open) return;
   const delay = 3 * 60 * 60 * 1000;
   const botName = (await bot.api.getMe()).username;
+  const group = (await getCurrentGroup())?.members || []; 
+  await increaseOrder();
+  const profiles = (await Array.fromAsync(group.map(async (id) => await getProfile(id)))).filter((e) => e !== null);
+  const text = `Сегодня дежурят:\n${profiles.map((profile) => `${profile.firstName} ${profile.lastName}`).join('\n')}`
 
   for (const channel of await listChannels()) {
     const now = new Date();
     try {
+      // 1. post the registry
       const post = await bot.api.sendMessage(channel.id, "post");
       const postId = await setPost(
         {
@@ -96,6 +103,9 @@ Deno.cron("daily entry", "15 2 * * MON-SAT", async () => {
         { reply_markup, parse_mode: "HTML" },
       );
       await requestPostClose(postId, delay);
+      // 2. post the duty group
+      await bot.api.sendMessage(channel.id, text);
+      console.log(`channel ${channel.id}: OK`)
     } catch {
       console.error(
         `Could not send message to allowed channel ${channel.id}, continuing`,

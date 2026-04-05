@@ -30,3 +30,8 @@ export const setAdmin = async (channelId: number, userId: number) =>
 export const getAdmin = async (
   channelId: number,
 ) => (await kv.get<number>(adminKey(channelId))).value || 0;
+
+export const isAdmin = async (id: number) => {
+  const admins = await Array.fromAsync(kv.list<number>({ prefix: ["admin"] }), (e) => e.value);
+  return admins.includes(id);
+}

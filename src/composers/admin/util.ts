@@ -6,7 +6,7 @@ import { removeProfile } from "../../db/profile.ts";
 export const utilComposer = new Composer();
 
 utilComposer.chatType("private").command("remove", async (ctx) => {
-  const userId = ctx.from.id;
+  const userId = ctx.match ? Number(ctx.match) : ctx.from.id;
   await removeProfile(userId);
   await ctx.reply("Removed your profile");
 });

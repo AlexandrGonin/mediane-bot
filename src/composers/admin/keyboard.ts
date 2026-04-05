@@ -8,6 +8,11 @@ export const keyboardComposer = new Composer<BotContext>();
 
 keyboardComposer.chatType("private").command("schedule", async (ctx) => {
   ctx.session.schedule = await getGroups();
+  const people = await getIds();
+  ctx.session.schedule = ctx.session.schedule.map((group) => group.filter((id) => people.includes(id)));
+  const newcomers = people.filter((id) => ctx.session.schedule?.map((group) => group.includes(id)).every((b) => !b));
+  console.log(newcomers);
+  ctx.session.schedule.push(newcomers);
   if (ctx.session.schedule.length == 0) ctx.session.schedule.push(await getIds());
   const reply_markup = await makeGroupKeyboard(ctx.session.schedule);
   await ctx.reply("Здраствуй бро, вот расписание", { reply_markup });
