@@ -33,3 +33,16 @@ export const sorting = (profile1: Profile, profile2: Profile) => {
     ? profile1.lastName.localeCompare(profile2.lastName)
     : profile1.firstName.localeCompare(profile2.firstName);
 };
+
+export const listProfiles = async () =>
+  await Array.fromAsync(
+    kv.list<Profile>({ prefix: ["profile"] }),
+    (e) => ({ id: Number(e.key[1]), ...e.value }),
+  );
+
+export const findByLastName = async (lastName: string) => {
+  const needle = lastName.trim().toLocaleLowerCase("ru");
+  return (await listProfiles()).filter(
+    (p) => p.lastName.trim().toLocaleLowerCase("ru") === needle,
+  );
+};
