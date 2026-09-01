@@ -46,3 +46,12 @@ export const findByLastName = async (lastName: string) => {
     (p) => p.lastName.trim().toLocaleLowerCase("ru") === needle,
   );
 };
+
+export const findProfiles = async (query: string) => {
+  if (/^\d+$/.test(query)) {
+    const id = Number(query);
+    const profile = await getProfile(id);
+    return profile ? [{ id, ...profile }] : [];
+  }
+  return await findByLastName(query);
+};
