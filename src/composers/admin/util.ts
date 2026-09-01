@@ -1,9 +1,16 @@
 import { Composer, Context, InlineKeyboard } from "grammy";
+import { BotContext } from "../../mod.ts";
 import { setAdmin, setChannel } from "../../db/channel.ts";
 import { closePost } from "../../mod.ts";
-import { findByLastName, getProfile, removeProfile } from "../../db/profile.ts";
+import {
+  findByLastName,
+  findProfiles,
+  getProfile,
+  removeProfile,
+  setProfile,
+} from "../../db/profile.ts";
 
-export const utilComposer = new Composer();
+export const utilComposer = new Composer<BotContext>();
 
 const OWNER_ID = Number(Deno.env.get("OWNER_ID"));
 if (!OWNER_ID) {
@@ -111,4 +118,71 @@ utilComposer.chatType("private").command("close", async (ctx) => {
 
   await closePost(postId);
   await ctx.react("👌");
+});
+
+owner.command("rename", async (ctx) => {
+  const parts = ctx.match.trim().split(/\s+/).filter(Boolean);
+  if (parts.length !== 3) {
+    await ctx.reply("Формат: /rename Фамилия НовоеИмя НоваяФамилия");
+    return;
+  }
+  const [query, firstName, lastName] = parts;
+
+  const found = await findProfiles(query);
+
+  if (found.length === 0) {
+    await ctx.reply(`Профиль «${query}» не найден`);
+    return;
+  }
+
+  if (found.length === 1) {
+    const p = found[0];
+    await setProfile(p.id, firstName, lastName, p.isFree);
+    await ctx.reply(`${p.firstName} ${p.lastName} → ${firstName} ${lastName}`);
+    return;
+  }
+
+  // однофамильцы: имя держим в сессии, в кнопку лезет только id
+  ctx.session.rename = { firstName, lastName };
+  const reply_markup = new InlineKeyboard();
+  for (const p of found) {
+    reply_markup.text(`${p.firstName} ${p.lastName}`, `ren:${p.id}`).row();
+  }
+  reply_markup.text("Отмена", "ren:cancel");
+  await ctx.reply(
+    `Нашёл несколько (${found.length}) — кого переименовать в «${firstName} ${lastName}»?`,
+    { reply_markup },
+  );
+});
+
+owner.callbackQuery(/^ren:/, async (ctx) => {
+  const arg = ctx.callbackQuery.data.slice(4);
+  const pending = ctx.session.rename;
+  ctx.session.rename = undefined;
+
+  if (arg === "cancel") {
+    await ctx.editMessageText("Отменено");
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  if (!pending) {
+    await ctx.editMessageText("Забыл, на что переименовывать — повтори /rename");
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  const id = Number(arg);
+  const profile = await getProfile(id);
+  if (!profile) {
+    await ctx.editMessageText("Профиль уже удалён");
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  await setProfile(id, pending.firstName, pending.lastName, profile.isFree);
+  await ctx.editMessageText(
+    `${profile.firstName} ${profile.lastName} → ${pending.firstName} ${pending.lastName}`,
+  );
+  await ctx.answerCallbackQuery({ text: "Готово" });
 });
