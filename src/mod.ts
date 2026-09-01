@@ -23,6 +23,7 @@ export interface SessionData {
   cardId?: number;
   schedule?: number[][];
   action?: string
+  rename?: { firstName: string; lastName: string };
 }
 
 export type BotContext = Context & SessionFlavor<SessionData>;
