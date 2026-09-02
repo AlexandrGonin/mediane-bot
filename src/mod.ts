@@ -68,7 +68,7 @@ bot.use(entryComposer);
 bot.use(channelComposer);
 
 // post opening
-Deno.cron("daily entry", "43 11 * * 1-6", async () => {
+Deno.cron("daily entry", "5 12 * * 1-6", async () => {
   const open = (await kv.get<boolean>(["open"])).value;
   if (!open) return;
   const delay = 3 * 60 * 60 * 1000;
