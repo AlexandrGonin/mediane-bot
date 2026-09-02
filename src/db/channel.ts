@@ -1,4 +1,5 @@
 import { kv } from "../mod.ts";
+import { getPost, savePost } from "./post.ts";
 
 export const channelKey = (id: number) => ["channel", id];
 
@@ -17,10 +18,16 @@ export const listChannels = async () =>
     }),
   )).filter((c) => c.isAllowed);
 
+// раньше здесь была очередь KV (kv.enqueue), но KV Connect на Deno Deploy
+// очереди не поддерживает — просто помечаем пост временем закрытия
 export const requestPostClose = async (
   postId: string,
   delay: number,
-) => await kv.enqueue(postId, { delay });
+) => {
+  const post = await getPost(postId);
+  if (!post) return;
+  await savePost(postId, { ...post, closeAt: Date.now() + delay });
+};
 
 export const adminKey = (channelId: number) => ["admin", channelId];
 
@@ -32,6 +39,9 @@ export const getAdmin = async (
 ) => (await kv.get<number>(adminKey(channelId))).value || 0;
 
 export const isAdmin = async (id: number) => {
-  const admins = await Array.fromAsync(kv.list<number>({ prefix: ["admin"] }), (e) => e.value);
+  const admins = await Array.fromAsync(
+    kv.list<number>({ prefix: ["admin"] }),
+    (e) => e.value,
+  );
   return admins.includes(id);
-}
+};
