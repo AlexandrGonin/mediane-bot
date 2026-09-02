@@ -26,13 +26,10 @@ export const removeProfile = async (id: number) =>
   await kv.delete(profileKey(id));
 
 export const getIds = async () =>
-  (await Array.fromAsync(kv.list<Profile>({ prefix: ["profile"] }), (e) => Number(e.key[1])))
-
-export const sorting = (profile1: Profile, profile2: Profile) => {
-  return (profile1.lastName != profile2.lastName)
-    ? profile1.lastName.localeCompare(profile2.lastName)
-    : profile1.firstName.localeCompare(profile2.firstName);
-};
+  (await Array.fromAsync(
+    kv.list<Profile>({ prefix: ["profile"] }),
+    (e) => Number(e.key[1]),
+  ));
 
 export const listProfiles = async () =>
   await Array.fromAsync(
@@ -47,6 +44,7 @@ export const findByLastName = async (lastName: string) => {
   );
 };
 
+// принимает либо числовой id, либо фамилию
 export const findProfiles = async (query: string) => {
   if (/^\d+$/.test(query)) {
     const id = Number(query);
@@ -54,4 +52,10 @@ export const findProfiles = async (query: string) => {
     return profile ? [{ id, ...profile }] : [];
   }
   return await findByLastName(query);
+};
+
+export const sorting = (profile1: Profile, profile2: Profile) => {
+  return (profile1.lastName != profile2.lastName)
+    ? profile1.lastName.localeCompare(profile2.lastName)
+    : profile1.firstName.localeCompare(profile2.firstName);
 };
