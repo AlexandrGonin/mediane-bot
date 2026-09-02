@@ -1,9 +1,7 @@
-import { Composer, Context, InlineKeyboard } from "grammy";
-import { BotContext } from "../../mod.ts";
+import { Composer, InlineKeyboard } from "grammy";
+import { BotContext, closePost, dailyPost } from "../../mod.ts";
 import { setAdmin, setChannel } from "../../db/channel.ts";
-import { closePost } from "../../mod.ts";
 import {
-  findByLastName,
   findProfiles,
   getProfile,
   removeProfile,
@@ -14,13 +12,17 @@ export const utilComposer = new Composer<BotContext>();
 
 const OWNER_ID = Number(Deno.env.get("OWNER_ID"));
 if (!OWNER_ID) {
-  console.error("OWNER_ID не задан или невалиден — команда /remove отключена");
+  console.error(
+    "OWNER_ID не задан или невалиден — /remove, /rename и /cron отключены",
+  );
 }
 
-const isOwner = (ctx: Context) => OWNER_ID > 0 && ctx.from?.id === OWNER_ID;
+const isOwner = (ctx: BotContext) => OWNER_ID > 0 && ctx.from?.id === OWNER_ID;
 
-// всё, что ниже, доступно только владельцу
+// всё, что висит на owner, доступно только владельцу бота
 const owner = utilComposer.chatType("private").filter(isOwner);
+
+// ---------- удаление профиля ----------
 
 owner.command("remove", async (ctx) => {
   const query = ctx.match.trim();
@@ -29,23 +31,10 @@ owner.command("remove", async (ctx) => {
     return;
   }
 
-  // на всякий случай оставляем удаление по числовому id
-  if (/^\d+$/.test(query)) {
-    const id = Number(query);
-    const profile = await getProfile(id);
-    if (!profile) {
-      await ctx.reply(`Профиль с id ${id} не найден`);
-      return;
-    }
-    await removeProfile(id);
-    await ctx.reply(`Удалён: ${profile.firstName} ${profile.lastName}`);
-    return;
-  }
-
-  const found = await findByLastName(query);
+  const found = await findProfiles(query);
 
   if (found.length === 0) {
-    await ctx.reply(`Профиль с фамилией «${query}» не найден`);
+    await ctx.reply(`Профиль «${query}» не найден`);
     return;
   }
 
@@ -88,37 +77,7 @@ owner.callbackQuery(/^del:/, async (ctx) => {
   await ctx.answerCallbackQuery({ text: "Готово" });
 });
 
-// add channel to approved list
-utilComposer.chatType("private").command("add", async (ctx) => {
-  const channelId = Number(ctx.match);
-  if (channelId) {
-    await setChannel(channelId, true);
-    await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
-  } else {
-    await ctx.reply("Неправильный ID канала");
-  }
-});
-
-utilComposer.chatType("private").command("set", async (ctx) => {
-  if (ctx.match.split(" ").length < 2) return;
-  const channelId = Number(ctx.match.split(" ")[0]);
-  const userId = Number(ctx.match.split(" ")[1]);
-  if (channelId < 0 && userId > 0) {
-    await setAdmin(channelId, userId);
-    await ctx.react("✍");
-  }
-});
-
-utilComposer.chatType("private").command("close", async (ctx) => {
-  const postId = ctx.match;
-  if (!postId) {
-    await ctx.react("🌚");
-    return;
-  }
-
-  await closePost(postId);
-  await ctx.react("👌");
-});
+// ---------- переименование профиля ----------
 
 owner.command("rename", async (ctx) => {
   const parts = ctx.match.trim().split(/\s+/).filter(Boolean);
@@ -142,7 +101,8 @@ owner.command("rename", async (ctx) => {
     return;
   }
 
-  // однофамильцы: имя держим в сессии, в кнопку лезет только id
+  // однофамильцы: новое имя держим в сессии, в кнопку лезет только id
+  // (у callback_data лимит 64 байта, кириллица — 2 байта на символ)
   ctx.session.rename = { firstName, lastName };
   const reply_markup = new InlineKeyboard();
   for (const p of found) {
@@ -185,4 +145,46 @@ owner.callbackQuery(/^ren:/, async (ctx) => {
     `${profile.firstName} ${profile.lastName} → ${pending.firstName} ${pending.lastName}`,
   );
   await ctx.answerCallbackQuery({ text: "Готово" });
+});
+
+// ---------- отладка крона (убрать после проверки) ----------
+
+owner.command("cron", async (ctx) => {
+  await ctx.reply("Запускаю крон вручную…");
+  await dailyPost();
+  await ctx.reply("Отработал, смотри логи");
+});
+
+// ---------- остальное, как было ----------
+
+// add channel to approved list
+utilComposer.chatType("private").command("add", async (ctx) => {
+  const channelId = Number(ctx.match);
+  if (channelId) {
+    await setChannel(channelId, true);
+    await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
+  } else {
+    await ctx.reply("Неправильный ID канала");
+  }
+});
+
+utilComposer.chatType("private").command("set", async (ctx) => {
+  if (ctx.match.split(" ").length < 2) return;
+  const channelId = Number(ctx.match.split(" ")[0]);
+  const userId = Number(ctx.match.split(" ")[1]);
+  if (channelId < 0 && userId > 0) {
+    await setAdmin(channelId, userId);
+    await ctx.react("✍");
+  }
+});
+
+utilComposer.chatType("private").command("close", async (ctx) => {
+  const postId = ctx.match;
+  if (!postId) {
+    await ctx.react("🌚");
+    return;
+  }
+
+  await closePost(postId);
+  await ctx.react("👌");
 });
