@@ -5,7 +5,7 @@ import { entryComposer } from "./composers/entry.ts";
 import { registryComposer } from "./composers/registry.ts";
 import { utilComposer } from "./composers/admin/util.ts";
 import { getAdmin, listChannels, requestPostClose } from "./db/channel.ts";
-import { deletePost, getPost, Post, setPost } from "./db/post.ts";
+import { deletePost, getPost, listPosts, Post, setPost } from "./db/post.ts";
 import { keyboardComposer } from "./composers/admin/keyboard.ts";
 import { getCurrentGroup, increaseOrder } from "./db/duty.ts";
 import { getProfile } from "./db/profile.ts";
@@ -126,7 +126,8 @@ export const dailyPost = async () => {
   }
 };
 
-Deno.cron("daily entry", "15 2 * * MON-SAT", dailyPost);
+// дни недели числами: Deploy не принимает MON-SAT
+Deno.cron("daily entry", "15 2 * * 1-6", dailyPost);
 
 // post closing
 export const closePost = async (postId: string) => {
@@ -145,6 +146,18 @@ export const closePost = async (postId: string) => {
   await deletePost(postId);
 };
 
-kv.listenQueue(closePost);
+// вместо kv.listenQueue: KV Connect на Deno Deploy не поддерживает очереди
+Deno.cron("close posts", "*/5 * * * *", async () => {
+  const now = Date.now();
+  for (const post of await listPosts()) {
+    if (!post.closeAt || post.closeAt > now) continue;
+    try {
+      await closePost(post.id);
+      console.log(`post ${post.id}: запись закрыта`);
+    } catch (err) {
+      console.error(`post ${post.id}: не удалось закрыть:`, err);
+    }
+  }
+});
 
 bot.catch(console.error);
