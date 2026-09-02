@@ -2,7 +2,7 @@ import { Composer, InlineKeyboard } from "grammy";
 import { BotContext, closePost, dailyPost } from "../../mod.ts";
 import { setAdmin, setChannel } from "../../db/channel.ts";
 import {
-  findProfiles,
+  findByLastName,
   getProfile,
   removeProfile,
   setProfile,
@@ -31,10 +31,10 @@ owner.command("remove", async (ctx) => {
     return;
   }
 
-  const found = await findProfiles(query);
+  const found = await findByLastName(query);
 
   if (found.length === 0) {
-    await ctx.reply(`Профиль «${query}» не найден`);
+    await ctx.reply(`Профиль с фамилией «${query}» не найден`);
     return;
   }
 
@@ -87,10 +87,10 @@ owner.command("rename", async (ctx) => {
   }
   const [query, firstName, lastName] = parts;
 
-  const found = await findProfiles(query);
+  const found = await findByLastName(query);
 
   if (found.length === 0) {
-    await ctx.reply(`Профиль «${query}» не найден`);
+    await ctx.reply(`Профиль с фамилией «${query}» не найден`);
     return;
   }
 
