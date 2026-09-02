@@ -22,7 +22,7 @@ export interface SessionData {
   isFree?: boolean;
   cardId?: number;
   schedule?: number[][];
-  action?: string
+  action?: string;
   rename?: { firstName: string; lastName: string };
 }
 
@@ -67,21 +67,27 @@ bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
 
-// post opening
-Deno.cron("daily entry", "7 12 * * 1-6", async () => {
+// ежедневная публикация: пост записи в столовую + список дежурных
+export const dailyPost = async () => {
   const open = (await kv.get<boolean>(["open"])).value;
   if (!open) return;
   const delay = 3 * 60 * 60 * 1000;
   const botName = (await bot.api.getMe()).username;
-  const group = (await getCurrentGroup())?.members || []; 
+  const group = (await getCurrentGroup())?.members || [];
   await increaseOrder();
-  const profiles = (await Array.fromAsync(group.map(async (id) => await getProfile(id)))).filter((e) => e !== null);
-  const text = `Сегодня дежурят:\n${profiles.map((profile) => `${profile.firstName} ${profile.lastName}`).join('\n')}`
+  const profiles =
+    (await Array.fromAsync(group.map(async (id) => await getProfile(id))))
+      .filter((e) => e !== null);
+  const text = `Сегодня дежурят:\n${
+    profiles.map((profile) => `${profile.firstName} ${profile.lastName}`).join(
+      "\n",
+    )
+  }`;
 
   for (const channel of await listChannels()) {
-    const now = new Date();
+    // 1. пост записи в столовую
     try {
-      // 1. post the registry
+      const now = new Date();
       const post = await bot.api.sendMessage(channel.id, "post");
       const postId = await setPost(
         {
@@ -104,16 +110,23 @@ Deno.cron("daily entry", "7 12 * * 1-6", async () => {
         { reply_markup, parse_mode: "HTML" },
       );
       await requestPostClose(postId, delay);
-      // 2. post the duty group
+      console.log(`channel ${channel.id}: столовая OK`);
+    } catch (err) {
+      console.error(`channel ${channel.id}: столовая упала:`, err);
+    }
+
+    // 2. список дежурных — отдельным try, чтобы не зависеть от первого
+    try {
+      await new Promise((r) => setTimeout(r, 3000)); // пауза против flood control
       await bot.api.sendMessage(channel.id, text);
-      console.log(`channel ${channel.id}: OK`)
-    } catch {
-      console.error(
-        `Could not send message to allowed channel ${channel.id}, continuing`,
-      );
+      console.log(`channel ${channel.id}: дежурство OK`);
+    } catch (err) {
+      console.error(`channel ${channel.id}: дежурство упало:`, err);
     }
   }
-});
+};
+
+Deno.cron("daily entry", "15 2 * * MON-SAT", dailyPost);
 
 // post closing
 export const closePost = async (postId: string) => {
