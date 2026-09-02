@@ -37,21 +37,12 @@ export const listProfiles = async () =>
     (e) => ({ id: Number(e.key[1]), ...e.value }),
   );
 
+// ищем ТОЛЬКО по фамилии — иначе фамилию вида "2" не найти
 export const findByLastName = async (lastName: string) => {
   const needle = lastName.trim().toLocaleLowerCase("ru");
   return (await listProfiles()).filter(
     (p) => p.lastName.trim().toLocaleLowerCase("ru") === needle,
   );
-};
-
-// принимает либо числовой id, либо фамилию
-export const findProfiles = async (query: string) => {
-  if (/^\d+$/.test(query)) {
-    const id = Number(query);
-    const profile = await getProfile(id);
-    return profile ? [{ id, ...profile }] : [];
-  }
-  return await findByLastName(query);
 };
 
 export const sorting = (profile1: Profile, profile2: Profile) => {
