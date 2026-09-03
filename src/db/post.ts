@@ -7,6 +7,7 @@ export interface Post {
   message_id: number;
   date: Date;
   closeAt?: number; // когда закрывать запись, мс epoch
+  closed?: boolean; // запись закрыта, но пост ещё обновляется
   lastText?: string; // что последний раз отрисовано в канале
 }
 
