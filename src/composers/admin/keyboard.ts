@@ -1,6 +1,7 @@
 import { Composer, InlineKeyboard } from "grammy";
 import { BotContext } from "../../mod.ts";
-import { getIds, getProfile } from "../../db/profile.ts";
+import { isOwner } from "../../owner.ts";
+import { getProfile, profileMap } from "../../db/profile.ts";
 import { getGroups, setGroups } from "../../db/duty.ts";
 
 export const keyboardComposer = new Composer<BotContext>();
@@ -8,106 +9,171 @@ export const keyboardComposer = new Composer<BotContext>();
 // сколько кнопок с людьми помещать в один ряд клавиатуры
 // поставь 1, если длинные имена всё ещё обрезаются
 const PER_ROW = 2;
+// Telegram не примет клавиатуру бесконечного размера
+const MAX_GROUPS = 40;
 
-keyboardComposer.chatType("private").command("schedule", async (ctx) => {
-  ctx.session.schedule = await getGroups();
-  const people = await getIds();
-  ctx.session.schedule = ctx.session.schedule.map((group) =>
-    group.filter((id) => people.includes(id))
+// расписание правит только владелец
+const owner = keyboardComposer.chatType("private").filter(isOwner);
+
+owner.command("schedule", async (ctx) => {
+  const groups = await getGroups();
+  const people = await profileMap();
+
+  const schedule = groups.map((group) =>
+    group.filter((id) => people.has(id))
   );
-  const newcomers = people.filter((id) =>
-    ctx.session.schedule?.map((group) => group.includes(id)).every((b) => !b)
-  );
-  ctx.session.schedule.push(newcomers);
-  if (ctx.session.schedule.length == 0) {
-    ctx.session.schedule.push(await getIds());
-  }
-  const reply_markup = await makeGroupKeyboard(ctx.session.schedule);
-  await ctx.reply("Здраствуй бро, вот расписание", { reply_markup });
+  const placed = new Set(schedule.flat());
+  schedule.push([...people.keys()].filter((id) => !placed.has(id)));
+
+  ctx.session.schedule = schedule;
+  ctx.session.action = undefined;
+  await ctx.reply("Здраствуй бро, вот расписание", {
+    reply_markup: await makeGroupKeyboard(schedule),
+  });
 });
 
-keyboardComposer.chatType("private").callbackQuery(
-  [/[0-9]+-[0-9]+/, /add-[0-9]+/],
+// индексы приходят из callback_data — их нельзя считать корректными
+const cell = (schedule: number[][], row: unknown, idx: unknown) =>
+  typeof row === "number" && typeof idx === "number" &&
+  Number.isInteger(row) && Number.isInteger(idx) &&
+  row >= 0 && row < schedule.length &&
+  idx >= 0 && idx < schedule[row].length;
+
+const rowExists = (schedule: number[][], row: unknown) =>
+  typeof row === "number" && Number.isInteger(row) &&
+  row >= 0 && row < schedule.length;
+
+owner.callbackQuery(
+  [/^[0-9]+-[0-9]+$/, /^add-[0-9]+$/],
   async (ctx) => {
+    const schedule = ctx.session.schedule;
+    if (!schedule) {
+      await ctx.answerCallbackQuery({
+        text: "Клавиатура устарела, открой /schedule заново",
+        show_alert: true,
+      });
+      return;
+    }
+
     const action = ctx.callbackQuery.data;
     if (!ctx.session.action) {
       ctx.session.action = action;
       await ctx.answerCallbackQuery({ text: "Выбрано, теперь второй" });
       return;
     }
-    const actionPair = [action.split("-"), ctx.session.action.split("-")];
-    ctx.session.action = undefined;
-    if (!ctx.session.schedule) return;
-    if (actionPair[0][0] == "add" && actionPair[1][0] == "add") return;
-    if (actionPair[0][0] != "add") {
-      [actionPair[0], actionPair[1]] = [actionPair[1], actionPair[0]];
-    }
-    if (actionPair[0][0] == "add") {
-      const newRow = Number(actionPair[0][1]);
-      const [oldRow, oldIdx] = actionPair[1].map(Number);
-      const id = ctx.session.schedule[oldRow].splice(oldIdx, 1);
-      ctx.session.schedule[newRow].push(...id);
-    } else {
-      const [row1, idx1] = actionPair[0].map(Number);
-      const [row2, idx2] = actionPair[1].map(Number);
-      [ctx.session.schedule[row1][idx1], ctx.session.schedule[row2][idx2]] = [
-        ctx.session.schedule[row2][idx2],
-        ctx.session.schedule[row1][idx1],
-      ];
-    }
-    const reply_markup = await makeGroupKeyboard(ctx.session.schedule);
-    await ctx.editMessageReplyMarkup({ reply_markup });
-    await ctx.answerCallbackQuery();
-  },
-);
 
-keyboardComposer.chatType("private").callbackQuery(
-  /ins-[0-9]+/,
-  async (ctx) => {
-    if (!ctx.session.schedule) return;
-    const rowPos = Number(ctx.callbackQuery.data.split("-")[1]);
-    ctx.session.schedule.splice(rowPos, 0, []);
-    const reply_markup = await makeGroupKeyboard(ctx.session.schedule);
-    await ctx.editMessageReplyMarkup({ reply_markup });
+    const pair = [action.split("-"), ctx.session.action.split("-")];
     ctx.session.action = undefined;
-    await ctx.answerCallbackQuery();
-  },
-);
 
-// удаление пустой группы
-keyboardComposer.chatType("private").callbackQuery(
-  /rm-[0-9]+/,
-  async (ctx) => {
-    if (!ctx.session.schedule) return;
-    const rowPos = Number(ctx.callbackQuery.data.split("-")[1]);
-    if (ctx.session.schedule[rowPos]?.length) {
-      await ctx.answerCallbackQuery({
-        text: "Сначала перенеси людей в другую группу",
-        show_alert: true,
-      });
+    if (pair[0][0] == "add" && pair[1][0] == "add") {
+      await ctx.answerCallbackQuery({ text: "Нужно выбрать человека" });
       return;
     }
-    ctx.session.schedule.splice(rowPos, 1);
-    ctx.session.action = undefined;
-    const reply_markup = await makeGroupKeyboard(ctx.session.schedule);
-    await ctx.editMessageReplyMarkup({ reply_markup });
-    await ctx.answerCallbackQuery({ text: "Группа удалена" });
+    if (pair[0][0] != "add") [pair[0], pair[1]] = [pair[1], pair[0]];
+
+    if (pair[0][0] == "add") {
+      const newRow = Number(pair[0][1]);
+      const [oldRow, oldIdx] = pair[1].map(Number);
+      if (!rowExists(schedule, newRow) || !cell(schedule, oldRow, oldIdx)) {
+        await ctx.answerCallbackQuery({
+          text: "Клавиатура устарела, открой /schedule заново",
+          show_alert: true,
+        });
+        return;
+      }
+      schedule[newRow].push(...schedule[oldRow].splice(oldIdx, 1));
+    } else {
+      const [row1, idx1] = pair[0].map(Number);
+      const [row2, idx2] = pair[1].map(Number);
+      if (!cell(schedule, row1, idx1) || !cell(schedule, row2, idx2)) {
+        await ctx.answerCallbackQuery({
+          text: "Клавиатура устарела, открой /schedule заново",
+          show_alert: true,
+        });
+        return;
+      }
+      [schedule[row1][idx1], schedule[row2][idx2]] = [
+        schedule[row2][idx2],
+        schedule[row1][idx1],
+      ];
+    }
+
+    await ctx.editMessageReplyMarkup({
+      reply_markup: await makeGroupKeyboard(schedule),
+    });
+    await ctx.answerCallbackQuery();
   },
 );
 
-keyboardComposer.chatType("private").callbackQuery("push", async (ctx) => {
-  if (!ctx.session.schedule) return;
-  ctx.session.schedule.push([]);
-  const reply_markup = await makeGroupKeyboard(ctx.session.schedule);
-  await ctx.editMessageReplyMarkup({ reply_markup });
+owner.callbackQuery(/^ins-[0-9]+$/, async (ctx) => {
+  const schedule = ctx.session.schedule;
+  const rowPos = Number(ctx.callbackQuery.data.split("-")[1]);
+  if (!schedule || !rowExists(schedule, rowPos)) {
+    await ctx.answerCallbackQuery({ text: "Открой /schedule заново" });
+    return;
+  }
+  if (schedule.length >= MAX_GROUPS) {
+    await ctx.answerCallbackQuery({ text: "Слишком много групп" });
+    return;
+  }
+  schedule.splice(rowPos, 0, []);
   ctx.session.action = undefined;
+  await ctx.editMessageReplyMarkup({
+    reply_markup: await makeGroupKeyboard(schedule),
+  });
   await ctx.answerCallbackQuery();
 });
 
-keyboardComposer.chatType("private").callbackQuery("save", async (ctx) => {
-  if (!ctx.session.schedule) return;
-  ctx.session.schedule = ctx.session.schedule.filter((e) => e.length);
-  await setGroups(ctx.session.schedule);
+// удаление пустой группы
+owner.callbackQuery(/^rm-[0-9]+$/, async (ctx) => {
+  const schedule = ctx.session.schedule;
+  const rowPos = Number(ctx.callbackQuery.data.split("-")[1]);
+  if (!schedule || !rowExists(schedule, rowPos)) {
+    await ctx.answerCallbackQuery({ text: "Открой /schedule заново" });
+    return;
+  }
+  if (schedule[rowPos].length) {
+    await ctx.answerCallbackQuery({
+      text: "Сначала перенеси людей в другую группу",
+      show_alert: true,
+    });
+    return;
+  }
+  schedule.splice(rowPos, 1);
+  ctx.session.action = undefined;
+  await ctx.editMessageReplyMarkup({
+    reply_markup: await makeGroupKeyboard(schedule),
+  });
+  await ctx.answerCallbackQuery({ text: "Группа удалена" });
+});
+
+owner.callbackQuery("push", async (ctx) => {
+  const schedule = ctx.session.schedule;
+  if (!schedule) {
+    await ctx.answerCallbackQuery({ text: "Открой /schedule заново" });
+    return;
+  }
+  if (schedule.length >= MAX_GROUPS) {
+    await ctx.answerCallbackQuery({ text: "Слишком много групп" });
+    return;
+  }
+  schedule.push([]);
+  ctx.session.action = undefined;
+  await ctx.editMessageReplyMarkup({
+    reply_markup: await makeGroupKeyboard(schedule),
+  });
+  await ctx.answerCallbackQuery();
+});
+
+owner.callbackQuery("save", async (ctx) => {
+  const schedule = ctx.session.schedule;
+  if (!schedule) {
+    await ctx.answerCallbackQuery({ text: "Открой /schedule заново" });
+    return;
+  }
+  await setGroups(schedule.filter((e) => e.length));
+  ctx.session.schedule = undefined;
+  ctx.session.action = undefined;
   await ctx.editMessageReplyMarkup({});
   await ctx.reply("Готово!");
   await ctx.answerCallbackQuery();
@@ -129,7 +195,6 @@ const makeGroupKeyboard = async (groups: number[][]) => {
     }
     if (inRow % PER_ROW !== 0) keyboard.row();
 
-    // строка управления группой — она же визуальный разделитель
     keyboard.text(`➕ в группу ${idx1 + 1}`, `add-${idx1}`);
     keyboard.text("⬆️ ряд", `ins-${idx1}`);
     if (group.length === 0) keyboard.text("🗑", `rm-${idx1}`);

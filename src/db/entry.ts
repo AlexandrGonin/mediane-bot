@@ -1,35 +1,43 @@
 import { kv } from "../mod.ts";
-import { getProfile } from "./profile.ts";
+import { isValidPostId } from "./post.ts";
 
-const entryKey = (
-  postId: string,
-  userId: number,
-) => [
-  "entry",
-  postId,
-  userId,
-];
+export const isValidUserId = (id: unknown): id is number =>
+  typeof id === "number" && Number.isSafeInteger(id) && id > 0;
 
-export const getEntry = async (postId: string, userId: number) =>
-  (await kv.get<true>(entryKey(postId, userId))).value;
+const entryKey = (postId: string, userId: number) => ["entry", postId, userId];
 
-export const setEntry = async (postId: string, userId: number) =>
+const valid = (postId: unknown, userId: unknown) =>
+  isValidPostId(postId) && isValidUserId(userId);
+
+export const getEntry = async (postId: string, userId: number) => {
+  if (!valid(postId, userId)) return null;
+  return (await kv.get<true>(entryKey(postId, userId))).value;
+};
+
+export const setEntry = async (postId: string, userId: number) => {
+  if (!valid(postId, userId)) return;
   await kv.set(entryKey(postId, userId), true);
+};
 
-export const removeEntry = async (
-  postId: string,
-  userId: number,
-) => await kv.delete(entryKey(postId, userId));
+export const removeEntry = async (postId: string, userId: number) => {
+  if (!valid(postId, userId)) return;
+  await kv.delete(entryKey(postId, userId));
+};
 
 // вычистить все записи поста (при окончательном удалении поста)
 export const removeEntries = async (postId: string) => {
+  if (!isValidPostId(postId)) return;
   for await (const e of kv.list({ prefix: ["entry", postId] })) {
     await kv.delete(e.key);
   }
 };
 
-export const listEntries = async (postId: string) =>
-  (await Array.fromAsync(
+// возвращаем id, а профили резолвит вызывающий — так их можно
+// загрузить одним списком, а не по одному запросу на человека
+export const listEntryIds = async (postId: string) => {
+  if (!isValidPostId(postId)) return [];
+  return (await Array.fromAsync(
     kv.list({ prefix: ["entry", postId] }),
-    async (e) => await getProfile(Number(e.key[2])),
-  )).filter((e) => e != null);
+    (e) => Number(e.key[2]),
+  )).filter(isValidUserId);
+};

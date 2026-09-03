@@ -1,10 +1,12 @@
 import { Composer, InlineKeyboard } from "grammy";
-import { BotContext, closePost, dailyPost, OWNER_ID } from "../../mod.ts";
-import { setAdmin, setChannel } from "../../db/channel.ts";
-import { listPosts } from "../../db/post.ts";
-import { removeEntry } from "../../db/entry.ts";
+import { BotContext, closePost, dailyPost } from "../../mod.ts";
+import { isOwner, OWNER_ID } from "../../owner.ts";
+import { isValidChannelId, setAdmin, setChannel } from "../../db/channel.ts";
+import { isValidPostId, listPosts } from "../../db/post.ts";
+import { isValidUserId, removeEntry } from "../../db/entry.ts";
 import {
   Ban,
+  cleanName,
   findBansByLastName,
   findByLastName,
   getProfile,
@@ -17,19 +19,33 @@ import {
 
 export const utilComposer = new Composer<BotContext>();
 
-const isOwner = (ctx: BotContext) => OWNER_ID > 0 && ctx.from?.id === OWNER_ID;
-
-// всё, что висит на owner, доступно только владельцу бота
+// ВСЕ служебные команды только у владельца: раньше /add, /set, /close
+// мог выполнить любой, кто нашёл бота
 const owner = utilComposer.chatType("private").filter(isOwner);
 
-// снимаем человека со всех открытых записей
+// снимаем человека со всех записей, включая закрытые
 const dropEntries = async (userId: number) => {
   for (const post of await listPosts()) {
     await removeEntry(post.id, userId);
   }
 };
 
+// разбор id из callback_data: строка приходит от пользователя
+const parseId = (raw: string) => {
+  const id = Number(raw);
+  return isValidUserId(id) ? id : null;
+};
+
 // ---------- баны ----------
+
+const banUser = async (id: number, firstName: string, lastName: string) => {
+  await setBan(id, {
+    firstName,
+    lastName,
+    at: new Date().toISOString(),
+  } as Ban);
+  await dropEntries(id);
+};
 
 owner.command("ban", async (ctx) => {
   const query = ctx.match.trim();
@@ -39,13 +55,16 @@ owner.command("ban", async (ctx) => {
   }
 
   const found = await findByLastName(query);
-
   if (found.length === 0) {
     await ctx.reply(`Профиль с фамилией «${query}» не найден`);
     return;
   }
 
   if (found.length === 1) {
+    if (found[0].id === OWNER_ID) {
+      await ctx.reply("Владельца заблокировать нельзя");
+      return;
+    }
     await banUser(found[0].id, found[0].firstName, found[0].lastName);
     await ctx.reply(`Заблокирован: ${found[0].firstName} ${found[0].lastName}`);
     return;
@@ -56,31 +75,24 @@ owner.command("ban", async (ctx) => {
     reply_markup.text(`${p.firstName} ${p.lastName}`, `ban:${p.id}`).row();
   }
   reply_markup.text("Отмена", "ban:cancel");
-  await ctx.reply(
-    `Нашёл несколько (${found.length}) — кого заблокировать?`,
-    { reply_markup },
-  );
+  await ctx.reply(`Нашёл несколько (${found.length}) — кого заблокировать?`, {
+    reply_markup,
+  });
 });
-
-const banUser = async (id: number, firstName: string, lastName: string) => {
-  await setBan(id, {
-    firstName,
-    lastName,
-    at: new Date().toISOString(),
-  } as Ban);
-  await dropEntries(id); // чтобы не висел в сегодняшнем списке
-};
 
 owner.callbackQuery(/^ban:/, async (ctx) => {
   const arg = ctx.callbackQuery.data.slice(4);
-
   if (arg === "cancel") {
     await ctx.editMessageText("Отменено");
     await ctx.answerCallbackQuery();
     return;
   }
 
-  const id = Number(arg);
+  const id = parseId(arg);
+  if (id === null) {
+    await ctx.answerCallbackQuery({ text: "Некорректная кнопка" });
+    return;
+  }
   if (id === OWNER_ID) {
     await ctx.answerCallbackQuery({
       text: "Владельца заблокировать нельзя",
@@ -111,15 +123,12 @@ owner.command("unban", async (ctx) => {
   }
 
   const found = await findBansByLastName(query);
-
   if (found.length === 0) {
     await ctx.reply(`В бане нет никого с фамилией «${query}»`);
     return;
   }
 
-  for (const b of found) {
-    await removeBan(b.id);
-  }
+  for (const b of found) await removeBan(b.id);
   await ctx.reply(
     `Разблокирован${found.length > 1 ? "ы" : ""}:\n${
       found.map((b) => `${b.firstName} ${b.lastName}`).join("\n")
@@ -153,7 +162,6 @@ owner.command("remove", async (ctx) => {
   }
 
   const found = await findByLastName(query);
-
   if (found.length === 0) {
     await ctx.reply(`Профиль с фамилией «${query}» не найден`);
     return;
@@ -171,22 +179,25 @@ owner.command("remove", async (ctx) => {
     reply_markup.text(`${p.firstName} ${p.lastName}`, `del:${p.id}`).row();
   }
   reply_markup.text("Отмена", "del:cancel");
-  await ctx.reply(
-    `Нашёл несколько (${found.length}) — кого удалить?`,
-    { reply_markup },
-  );
+  await ctx.reply(`Нашёл несколько (${found.length}) — кого удалить?`, {
+    reply_markup,
+  });
 });
 
 owner.callbackQuery(/^del:/, async (ctx) => {
   const arg = ctx.callbackQuery.data.slice(4);
-
   if (arg === "cancel") {
     await ctx.editMessageText("Отменено");
     await ctx.answerCallbackQuery();
     return;
   }
 
-  const id = Number(arg);
+  const id = parseId(arg);
+  if (id === null) {
+    await ctx.answerCallbackQuery({ text: "Некорректная кнопка" });
+    return;
+  }
+
   const profile = await getProfile(id);
   if (!profile) {
     await ctx.editMessageText("Профиль уже удалён");
@@ -203,15 +214,21 @@ owner.callbackQuery(/^del:/, async (ctx) => {
 // ---------- переименование профиля ----------
 
 owner.command("rename", async (ctx) => {
-  const parts = ctx.match.trim().split(/\s+/).filter(Boolean);
+  const parts = ctx.match.trim().split(/\s+/u).filter(Boolean);
   if (parts.length !== 3) {
     await ctx.reply("Формат: /rename Фамилия НовоеИмя НоваяФамилия");
     return;
   }
-  const [query, firstName, lastName] = parts;
+  const [query, rawFirst, rawLast] = parts;
+
+  const firstName = cleanName(rawFirst);
+  const lastName = cleanName(rawLast);
+  if (!firstName || !lastName) {
+    await ctx.reply("Имя и фамилия — до 32 символов, без команд");
+    return;
+  }
 
   const found = await findByLastName(query);
-
   if (found.length === 0) {
     await ctx.reply(`Профиль с фамилией «${query}» не найден`);
     return;
@@ -248,14 +265,18 @@ owner.callbackQuery(/^ren:/, async (ctx) => {
     await ctx.answerCallbackQuery();
     return;
   }
-
   if (!pending) {
     await ctx.editMessageText("Забыл, на что переименовывать — повтори /rename");
     await ctx.answerCallbackQuery();
     return;
   }
 
-  const id = Number(arg);
+  const id = parseId(arg);
+  if (id === null) {
+    await ctx.answerCallbackQuery({ text: "Некорректная кнопка" });
+    return;
+  }
+
   const profile = await getProfile(id);
   if (!profile) {
     await ctx.editMessageText("Профиль уже удалён");
@@ -270,44 +291,48 @@ owner.callbackQuery(/^ren:/, async (ctx) => {
   await ctx.answerCallbackQuery({ text: "Готово" });
 });
 
+// ---------- каналы ----------
+
+owner.command("add", async (ctx) => {
+  const channelId = Number(ctx.match.trim());
+  if (!isValidChannelId(channelId)) {
+    await ctx.reply("Неправильный ID канала (должен быть отрицательным)");
+    return;
+  }
+  await setChannel(channelId, true);
+  await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
+});
+
+owner.command("set", async (ctx) => {
+  const parts = ctx.match.trim().split(/\s+/u).filter(Boolean);
+  if (parts.length < 2) {
+    await ctx.reply("Формат: /set -100... <user_id>");
+    return;
+  }
+  const channelId = Number(parts[0]);
+  const userId = Number(parts[1]);
+  if (!isValidChannelId(channelId) || !isValidUserId(userId)) {
+    await ctx.reply("Неправильные id");
+    return;
+  }
+  await setAdmin(channelId, userId);
+  await ctx.react("✍");
+});
+
+owner.command("close", async (ctx) => {
+  const postId = ctx.match.trim();
+  if (!isValidPostId(postId)) {
+    await ctx.react("🌚");
+    return;
+  }
+  await closePost(postId);
+  await ctx.react("👌");
+});
+
 // ---------- отладка крона (убрать после проверки) ----------
 
 owner.command("cron", async (ctx) => {
   await ctx.reply("Запускаю крон вручную…");
   await dailyPost();
   await ctx.reply("Отработал, смотри логи");
-});
-
-// ---------- остальное, как было ----------
-
-// add channel to approved list
-utilComposer.chatType("private").command("add", async (ctx) => {
-  const channelId = Number(ctx.match);
-  if (channelId) {
-    await setChannel(channelId, true);
-    await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
-  } else {
-    await ctx.reply("Неправильный ID канала");
-  }
-});
-
-utilComposer.chatType("private").command("set", async (ctx) => {
-  if (ctx.match.split(" ").length < 2) return;
-  const channelId = Number(ctx.match.split(" ")[0]);
-  const userId = Number(ctx.match.split(" ")[1]);
-  if (channelId < 0 && userId > 0) {
-    await setAdmin(channelId, userId);
-    await ctx.react("✍");
-  }
-});
-
-utilComposer.chatType("private").command("close", async (ctx) => {
-  const postId = ctx.match;
-  if (!postId) {
-    await ctx.react("🌚");
-    return;
-  }
-
-  await closePost(postId);
-  await ctx.react("👌");
 });
