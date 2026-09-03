@@ -21,6 +21,13 @@ export const removeEntry = async (
   userId: number,
 ) => await kv.delete(entryKey(postId, userId));
 
+// вычистить все записи поста (при окончательном удалении поста)
+export const removeEntries = async (postId: string) => {
+  for await (const e of kv.list({ prefix: ["entry", postId] })) {
+    await kv.delete(e.key);
+  }
+};
+
 export const listEntries = async (postId: string) =>
   (await Array.fromAsync(
     kv.list({ prefix: ["entry", postId] }),
