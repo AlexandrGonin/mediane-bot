@@ -11,7 +11,7 @@ import { registryComposer } from "./composers/registry.ts";
 import { utilComposer } from "./composers/admin/util.ts";
 import { keyboardComposer } from "./composers/admin/keyboard.ts";
 import { isOwner, OWNER_ID } from "./owner.ts";
-import { getAdmin, listChannels } from "./db/channel.ts";
+import { listChannels, purgeLegacyAdmins } from "./db/channel.ts";
 import {
   deletePost,
   getPost,
@@ -52,6 +52,9 @@ const PURGE_AFTER = 3 * 24 * 60 * 60 * 1000;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
+
+// разовая чистка ключей старой схемы прав
+purgeLegacyAdmins().catch((err) => console.error("purgeLegacyAdmins:", err));
 
 bot.use(session({
   initial: () => ({}),
@@ -177,13 +180,14 @@ export const closePost = async (postId: string) => {
   const post = await getPost(postId);
   if (!post || post.closed) return;
 
-  const adminId = await getAdmin(post.channel_id);
-  if (adminId) {
+  // итог уходит владельцу и только ему: получателя больше нельзя
+  // переназначить через базу, он берётся из OWNER_ID
+  if (OWNER_ID) {
     try {
-      await bot.api.forwardMessage(adminId, post.channel_id, post.message_id);
+      await bot.api.forwardMessage(OWNER_ID, post.channel_id, post.message_id);
     } catch (err) {
-      // не смогли переслать админу — это не повод не закрывать запись
-      console.error(`post ${postId}: пересылка админу не прошла:`, err);
+      // не смогли переслать владельцу — это не повод не закрывать запись
+      console.error(`post ${postId}: пересылка владельцу не прошла:`, err);
     }
   }
 

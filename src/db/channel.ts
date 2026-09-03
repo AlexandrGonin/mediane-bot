@@ -1,5 +1,4 @@
 import { kv } from "../mod.ts";
-import { isValidUserId } from "./entry.ts";
 
 // у каналов и супергрупп id всегда отрицательный
 export const isValidChannelId = (id: unknown): id is number =>
@@ -26,24 +25,16 @@ export const listChannels = async () =>
     }),
   )).filter((c) => isValidChannelId(c.id) && c.isAllowed === true);
 
-export const adminKey = (channelId: number) => ["admin", channelId];
-
-export const setAdmin = async (channelId: number, userId: number) => {
-  if (!isValidChannelId(channelId) || !isValidUserId(userId)) return;
-  await kv.set(adminKey(channelId), userId);
-};
-
-export const getAdmin = async (channelId: unknown) => {
-  if (!isValidChannelId(channelId)) return 0;
-  const value = (await kv.get<number>(adminKey(channelId))).value;
-  return isValidUserId(value) ? value : 0;
-};
-
-export const isAdmin = async (id: unknown) => {
-  if (!isValidUserId(id)) return false;
-  const admins = await Array.fromAsync(
-    kv.list<number>({ prefix: ["admin"] }),
-    (e) => e.value,
-  );
-  return admins.includes(id);
+// Права администратора в базе больше НЕ хранятся: единственный источник
+// прав — переменная окружения OWNER_ID (см. src/owner.ts). Раньше здесь
+// жили ключи ["admin", <канал>] = <user id>, которые ставила команда /set,
+// и любой желающий мог переписать их на себя. Ключи вычищаются один раз
+// при старте, чтобы в базе не оставалось следов старой схемы.
+export const purgeLegacyAdmins = async () => {
+  let removed = 0;
+  for await (const e of kv.list({ prefix: ["admin"] })) {
+    await kv.delete(e.key);
+    removed++;
+  }
+  if (removed) console.log(`удалено устаревших admin-ключей: ${removed}`);
 };

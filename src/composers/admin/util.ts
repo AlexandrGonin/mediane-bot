@@ -1,7 +1,7 @@
 import { Composer, InlineKeyboard } from "grammy";
 import { BotContext, closePost, dailyPost } from "../../mod.ts";
 import { isOwner, OWNER_ID } from "../../owner.ts";
-import { isValidChannelId, setAdmin, setChannel } from "../../db/channel.ts";
+import { isValidChannelId, setChannel } from "../../db/channel.ts";
 import { isValidPostId, listPosts } from "../../db/post.ts";
 import { isValidUserId, removeEntry } from "../../db/entry.ts";
 import {
@@ -303,21 +303,6 @@ owner.command("add", async (ctx) => {
   await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
 });
 
-owner.command("set", async (ctx) => {
-  const parts = ctx.match.trim().split(/\s+/u).filter(Boolean);
-  if (parts.length < 2) {
-    await ctx.reply("Формат: /set -100... <user_id>");
-    return;
-  }
-  const channelId = Number(parts[0]);
-  const userId = Number(parts[1]);
-  if (!isValidChannelId(channelId) || !isValidUserId(userId)) {
-    await ctx.reply("Неправильные id");
-    return;
-  }
-  await setAdmin(channelId, userId);
-  await ctx.react("✍");
-});
 
 owner.command("close", async (ctx) => {
   const postId = ctx.match.trim();
