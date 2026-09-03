@@ -1,6 +1,10 @@
 import { DenoKVAdapter } from "storage";
 import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
-import { channelComposer, generatePostText } from "./composers/channel.ts";
+import {
+  channelComposer,
+  refreshPosts,
+  updatePost,
+} from "./composers/channel.ts";
 import { entryComposer } from "./composers/entry.ts";
 import { registryComposer } from "./composers/registry.ts";
 import { utilComposer } from "./composers/admin/util.ts";
@@ -8,7 +12,7 @@ import { getAdmin, listChannels, requestPostClose } from "./db/channel.ts";
 import { deletePost, getPost, listPosts, Post, setPost } from "./db/post.ts";
 import { keyboardComposer } from "./composers/admin/keyboard.ts";
 import { getCurrentGroup, increaseOrder } from "./db/duty.ts";
-import { getProfile } from "./db/profile.ts";
+import { getProfile, isBanned } from "./db/profile.ts";
 
 export enum RegStatus {
   name,
@@ -28,6 +32,13 @@ export interface SessionData {
 
 export type BotContext = Context & SessionFlavor<SessionData>;
 
+export const OWNER_ID = Number(Deno.env.get("OWNER_ID"));
+if (!OWNER_ID) {
+  console.error("OWNER_ID не задан или невалиден — команды владельца отключены");
+}
+
+const BAN_TEXT = "Вы были заблокированы, можете обратиться к администратору";
+
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
 
@@ -35,6 +46,35 @@ bot.use(session({
   initial: () => ({}),
   storage: new DenoKVAdapter(kv),
 }));
+
+// бан-фильтр: стоит раньше всех обработчиков, поэтому забаненный
+// не может ни зарегистрироваться, ни сменить имя, ни записаться
+bot.use(async (ctx, next) => {
+  const id = ctx.from?.id;
+  if (!id || id === OWNER_ID) {
+    await next();
+    return;
+  }
+  if (!await isBanned(id)) {
+    await next();
+    return;
+  }
+  if (ctx.callbackQuery) {
+    await ctx.answerCallbackQuery({ text: BAN_TEXT, show_alert: true });
+  } else if (ctx.chat?.type === "private") {
+    await ctx.reply(BAN_TEXT);
+  }
+});
+
+// после любого действия приводим посты в канале в актуальный вид
+bot.use(async (ctx, next) => {
+  await next();
+  try {
+    await refreshPosts();
+  } catch (err) {
+    console.error("refreshPosts:", err);
+  }
+});
 
 bot.command("cancel", async (ctx) => {
   ctx.session = {};
@@ -72,7 +112,6 @@ export const dailyPost = async () => {
   const open = (await kv.get<boolean>(["open"])).value;
   if (!open) return;
   const delay = 3 * 60 * 60 * 1000;
-  const botName = (await bot.api.getMe()).username;
   const group = (await getCurrentGroup())?.members || [];
   await increaseOrder();
   const profiles =
@@ -99,16 +138,7 @@ export const dailyPost = async () => {
           date: now,
         } as Post,
       );
-      const reply_markup = new InlineKeyboard().url(
-        "Запись в боте",
-        `https://t.me/${botName}?start=${postId}`,
-      );
-      await bot.api.editMessageText(
-        channel.id,
-        post.message_id,
-        await generatePostText(postId),
-        { reply_markup, parse_mode: "HTML" },
-      );
+      await updatePost(postId);
       await requestPostClose(postId, delay);
       console.log(`channel ${channel.id}: столовая OK`);
     } catch (err) {
