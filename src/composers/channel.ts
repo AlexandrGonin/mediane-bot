@@ -59,10 +59,13 @@ export const renderPost = async (id: string, post: Post) => {
   const text = await generatePostText(id);
   if (post.lastText === text) return;
 
-  const reply_markup = new InlineKeyboard().url(
-    "Запись в боте",
-    `https://t.me/${await getBotName()}?start=${id}`,
-  );
+  const reply_markup = post.closed
+    ? new InlineKeyboard().text("🔒 Запись закрыта", "closed")
+    : new InlineKeyboard().url(
+      "Запись в боте",
+      `https://t.me/${await getBotName()}?start=${id}`,
+    );
+
   try {
     await bot.api.editMessageText(
       post.channel_id,
@@ -82,7 +85,7 @@ export const updatePost = async (postId: string) => {
   await renderPost(postId, post);
 };
 
-// прогон по всем открытым постам — вызывается после любого действия с ботом
+// прогон по всем постам, включая закрытые — они тоже должны быть актуальны
 export const refreshPosts = async () => {
   for (const post of await listPosts()) {
     const { id, ...data } = post;
