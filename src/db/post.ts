@@ -7,6 +7,7 @@ export interface Post {
   message_id: number;
   date: Date;
   closeAt?: number; // когда закрывать запись, мс epoch
+  lastText?: string; // что последний раз отрисовано в канале
 }
 
 export const setPost = async (post: Post) => {
