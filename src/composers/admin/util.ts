@@ -4,6 +4,7 @@ import { isOwner, OWNER_ID } from "../../owner.ts";
 import { isValidChannelId, setChannel } from "../../db/channel.ts";
 import { isValidPostId, listPosts } from "../../db/post.ts";
 import { isValidUserId, removeEntry } from "../../db/entry.ts";
+import { currentGroup, dutyNames, liveGroups, shiftOrder } from "../../db/duty.ts";
 import {
   Ban,
   cleanName,
@@ -19,31 +20,70 @@ import {
 
 export const utilComposer = new Composer<BotContext>();
 
-// ВСЕ служебные команды только у владельца: раньше /add, /set, /close
-// мог выполнить любой, кто нашёл бота
+// Every command below is gated on OWNER_ID. Nothing in the database can grant
+// these rights.
 const owner = utilComposer.chatType("private").filter(isOwner);
 
-// снимаем человека со всех записей, включая закрытые
+const MAX_STEP = 1000;
+
 const dropEntries = async (userId: number) => {
-  for (const post of await listPosts()) {
-    await removeEntry(post.id, userId);
-  }
+  for (const post of await listPosts()) await removeEntry(post.id, userId);
 };
 
-// разбор id из callback_data: строка приходит от пользователя
 const parseId = (raw: string) => {
   const id = Number(raw);
   return isValidUserId(id) ? id : null;
 };
 
-// ---------- баны ----------
+const parseStep = (raw: string) => {
+  const value = raw.trim();
+  if (!value) return 1;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 && n <= MAX_STEP ? n : null;
+};
+
+// --- duty queue ---
+
+const describeGroup = async () => {
+  const live = await liveGroups();
+  if (live.length === 0) return "Живых групп нет — заполни /schedule";
+  const group = await currentGroup();
+  if (!group) return "Живых групп нет — заполни /schedule";
+  const position = live.findIndex((g) => g.index === group.index) + 1;
+  const names = await dutyNames(group.members);
+  return `Следующими дежурят (группа ${position} из ${live.length}):\n${
+    names.join("\n")
+  }`;
+};
+
+owner.command("current", async (ctx) => {
+  await ctx.reply(await describeGroup());
+});
+
+owner.command("roll", async (ctx) => {
+  const step = parseStep(ctx.match);
+  if (step === null) {
+    await ctx.reply(`Формат: /roll <число от 0 до ${MAX_STEP}>`);
+    return;
+  }
+  await shiftOrder(step);
+  await ctx.reply(`Прокрутил на ${step}.\n\n${await describeGroup()}`);
+});
+
+owner.command("rollback", async (ctx) => {
+  const step = parseStep(ctx.match);
+  if (step === null) {
+    await ctx.reply(`Формат: /rollback <число от 0 до ${MAX_STEP}>`);
+    return;
+  }
+  await shiftOrder(-step);
+  await ctx.reply(`Отмотал на ${step}.\n\n${await describeGroup()}`);
+});
+
+// --- bans ---
 
 const banUser = async (id: number, firstName: string, lastName: string) => {
-  await setBan(id, {
-    firstName,
-    lastName,
-    at: new Date().toISOString(),
-  } as Ban);
+  await setBan(id, { firstName, lastName, at: new Date().toISOString() } as Ban);
   await dropEntries(id);
 };
 
@@ -144,15 +184,13 @@ owner.command("banlist", async (ctx) => {
   }
   const lines = bans.map((b) =>
     `${b.firstName} ${b.lastName} — ${
-      new Date(b.at).toLocaleDateString("ru", {
-        timeZone: "Asia/Yekaterinburg",
-      })
+      new Date(b.at).toLocaleDateString("ru", { timeZone: "Asia/Yekaterinburg" })
     }`
   );
   await ctx.reply(`Заблокированы (${bans.length}):\n${lines.join("\n")}`);
 });
 
-// ---------- удаление профиля ----------
+// --- profiles ---
 
 owner.command("remove", async (ctx) => {
   const query = ctx.match.trim();
@@ -211,8 +249,6 @@ owner.callbackQuery(/^del:/, async (ctx) => {
   await ctx.answerCallbackQuery({ text: "Готово" });
 });
 
-// ---------- переименование профиля ----------
-
 owner.command("rename", async (ctx) => {
   const parts = ctx.match.trim().split(/\s+/u).filter(Boolean);
   if (parts.length !== 3) {
@@ -241,8 +277,8 @@ owner.command("rename", async (ctx) => {
     return;
   }
 
-  // однофамильцы: новое имя держим в сессии, в кнопку лезет только id
-  // (у callback_data лимит 64 байта, кириллица — 2 байта на символ)
+  // Namesakes: the new name goes to the session because callback data is
+  // capped at 64 bytes and Cyrillic costs two per character.
   ctx.session.rename = { firstName, lastName };
   const reply_markup = new InlineKeyboard();
   for (const p of found) {
@@ -291,7 +327,7 @@ owner.callbackQuery(/^ren:/, async (ctx) => {
   await ctx.answerCallbackQuery({ text: "Готово" });
 });
 
-// ---------- каналы ----------
+// --- channels and posts ---
 
 owner.command("add", async (ctx) => {
   const channelId = Number(ctx.match.trim());
@@ -303,7 +339,6 @@ owner.command("add", async (ctx) => {
   await ctx.reply(`Канал с ID ${channelId} добавлен в разрешенные`);
 });
 
-
 owner.command("close", async (ctx) => {
   const postId = ctx.match.trim();
   if (!isValidPostId(postId)) {
@@ -314,10 +349,11 @@ owner.command("close", async (ctx) => {
   await ctx.react("👌");
 });
 
-// ---------- отладка крона (убрать после проверки) ----------
-
+// Publishes the same thing the morning cron does, including the queue step.
 owner.command("cron", async (ctx) => {
-  await ctx.reply("Запускаю крон вручную…");
+  await ctx.reply("Публикую как утренний крон…");
   await dailyPost();
-  await ctx.reply("Отработал, смотри логи");
+  await ctx.reply(
+    `Готово. Очередь сдвинулась на 1 — вернуть можно /rollback 1\n\n${await describeGroup()}`,
+  );
 });

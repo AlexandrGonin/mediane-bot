@@ -20,11 +20,7 @@ const genReplyMarkup = (ctx: BotContext) => {
       }`,
       "paid",
     ).row();
-  if (
-    ctx.session.name &&
-    ctx.session.surname &&
-    ctx.session.isFree != undefined
-  ) {
+  if (ctx.session.name && ctx.session.surname && ctx.session.isFree != undefined) {
     reply_markup.text("Подтвердить и закончить", "check");
   } else {
     reply_markup.text("Необходимо заполнить все поля❗", "noop");
@@ -38,16 +34,15 @@ registryComposer.chatType("private").callbackQuery("noop", async (ctx) => {
 
 registryComposer.chatType("private").command("register", async (ctx) => {
   ctx.session = {};
-  const profile = await getProfile(ctx.from.id);
-  if (profile != null) {
+  if (await getProfile(ctx.from.id)) {
     await ctx.reply("Ты уже зарегистрирован");
     return;
   }
 
-  const cardMsg = await ctx.reply("Регистрация: ", {
+  const card = await ctx.reply("Регистрация: ", {
     reply_markup: genReplyMarkup(ctx),
   });
-  ctx.session.cardId = cardMsg.message_id;
+  ctx.session.cardId = card.message_id;
 });
 
 registryComposer.chatType("private").callbackQuery("back", async (ctx) => {
@@ -72,15 +67,14 @@ registryComposer.chatType("private").callbackQuery("surname", async (ctx) => {
   await ctx.answerCallbackQuery();
 });
 
-// один обработчик на оба поля: раньше их было два, и оба молча
-// съедали любой текст, включая команды
+// One handler for both fields.
 registryComposer.chatType("private")
   .filter((ctx) =>
     ctx.session.status === RegStatus.name ||
     ctx.session.status === RegStatus.surname
   )
   .on("message:text", async (ctx, next) => {
-    // команды пропускаем дальше, иначе "/start" записывался бы в имя
+    // Commands pass through instead of being swallowed as a name.
     if (ctx.msg.text.startsWith("/")) {
       ctx.session.status = undefined;
       await next();
@@ -97,7 +91,6 @@ registryComposer.chatType("private")
     else ctx.session.surname = value;
     ctx.session.status = undefined;
 
-    // карточки может уже не быть — тогда просто рисуем новую
     if (ctx.session.cardId) {
       try {
         await ctx.api.editMessageText(
@@ -119,7 +112,7 @@ registryComposer.chatType("private")
 
     try {
       await ctx.deleteMessage();
-    } catch { /* сообщение старше 48 часов или уже удалено */ }
+    } catch { /* older than 48h or already gone */ }
   });
 
 registryComposer.chatType("private").callbackQuery("paid", async (ctx) => {
@@ -130,16 +123,17 @@ registryComposer.chatType("private").callbackQuery("paid", async (ctx) => {
   await ctx.answerCallbackQuery();
 });
 
-registryComposer.chatType("private")
-  .callbackQuery(["yes", "no"], async (ctx) => {
+registryComposer.chatType("private").callbackQuery(
+  ["yes", "no"],
+  async (ctx) => {
     ctx.session.isFree = ctx.callbackQuery.data == "yes";
     ctx.session.status = undefined;
-
     await ctx.editMessageText("Регистрация:", {
       reply_markup: genReplyMarkup(ctx),
     });
     await ctx.answerCallbackQuery();
-  });
+  },
+);
 
 registryComposer.chatType("private").callbackQuery("check", async (ctx) => {
   const reply_markup = new InlineKeyboard()
@@ -158,8 +152,8 @@ registryComposer.chatType("private").callbackQuery("check", async (ctx) => {
 registryComposer.chatType("private").callbackQuery("confirm", async (ctx) => {
   await ctx.editMessageReplyMarkup();
 
-  // повторная проверка: карточка могла провисеть с прошлого раза,
-  // и через неё можно было переписать себе имя в обход владельца
+  // A stale card left over from an earlier session would otherwise let a
+  // registered user rewrite their own name, bypassing owner control.
   if (await getProfile(ctx.from.id)) {
     await ctx.reply("Ты уже зарегистрирован");
     ctx.session = {};

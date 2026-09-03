@@ -21,8 +21,8 @@ import {
   setPost,
 } from "./db/post.ts";
 import { removeEntries } from "./db/entry.ts";
-import { getCurrentGroup, increaseOrder } from "./db/duty.ts";
-import { getProfile, isBanned } from "./db/profile.ts";
+import { advanceOrder, currentGroup, dutyText } from "./db/duty.ts";
+import { isBanned } from "./db/profile.ts";
 
 export enum RegStatus {
   name,
@@ -43,26 +43,25 @@ export interface SessionData {
 export type BotContext = Context & SessionFlavor<SessionData>;
 
 if (!OWNER_ID) {
-  console.error("OWNER_ID не задан или невалиден — команды владельца отключены");
+  console.error("OWNER_ID is unset or invalid — owner commands are disabled");
 }
 
 const BAN_TEXT = "Вы были заблокированы, можете обратиться к администратору";
-// сколько держим закрытые посты, прежде чем удалить их вместе с записями
+
+// How long a closed post is kept before it and its entries are deleted.
 const PURGE_AFTER = 3 * 24 * 60 * 60 * 1000;
 
 export const bot = new Bot<BotContext>(Deno.env.get("TOKEN") || "");
 export const kv = await Deno.openKv();
 
-// разовая чистка ключей старой схемы прав
 purgeLegacyAdmins().catch((err) => console.error("purgeLegacyAdmins:", err));
 
-bot.use(session({
-  initial: () => ({}),
-  storage: new DenoKVAdapter(kv),
-}));
+bot.use(session({ initial: () => ({}), storage: new DenoKVAdapter(kv) }));
 
-// бан-фильтр стоит раньше всех обработчиков, поэтому забаненный
-// не может ни зарегистрироваться, ни сменить имя, ни записаться
+// --- middleware ---
+
+// Runs ahead of every handler, so a banned user cannot register, rename
+// themselves or sign up.
 bot.use(async (ctx, next) => {
   const id = ctx.from?.id;
   if (!id || id === OWNER_ID) {
@@ -80,7 +79,8 @@ bot.use(async (ctx, next) => {
   }
 });
 
-// после любого действия приводим посты в канале в актуальный вид
+// Keeps channel posts in sync after any action. refreshPosts skips the API
+// call when nothing changed, so ordinary traffic costs no Telegram requests.
 bot.use(async (ctx, next) => {
   await next();
   try {
@@ -90,30 +90,28 @@ bot.use(async (ctx, next) => {
   }
 });
 
+// --- top-level handlers ---
+
 bot.command("cancel", async (ctx) => {
   ctx.session = {};
   await ctx.reply("Действие отменено.");
 });
 
-bot.callbackQuery(
-  "closed",
-  async (ctx) =>
-    await ctx.answerCallbackQuery({
-      text:
-        "🔒 Запись закрыта!\n\nСкорее всего, вышло время, до которого можно было записаться.",
-      show_alert: true,
-    }),
-);
+bot.callbackQuery("closed", async (ctx) =>
+  await ctx.answerCallbackQuery({
+    text:
+      "🔒 Запись закрыта!\n\nСкорее всего, вышло время, до которого можно было записаться.",
+    show_alert: true,
+  }));
 
-// выключатель автопостинга — тоже только владельцу
 bot.chatType("private").filter(isOwner).command("stop", async (ctx) => {
   await kv.set(["open"], false);
-  await ctx.reply("closed");
+  await ctx.reply("Автопостинг выключен. Включить обратно: /open");
 });
 
 bot.chatType("private").filter(isOwner).command("open", async (ctx) => {
   await kv.set(["open"], true);
-  await ctx.reply("open");
+  await ctx.reply("Автопостинг включён");
 });
 
 bot.use(keyboardComposer);
@@ -122,24 +120,18 @@ bot.use(registryComposer);
 bot.use(entryComposer);
 bot.use(channelComposer);
 
-// ежедневная публикация: пост записи в столовую + список дежурных
-export const dailyPost = async () => {
-  const open = (await kv.get<boolean>(["open"])).value;
-  if (!open) return;
+// --- scheduled work ---
 
-  const group = (await getCurrentGroup())?.members || [];
-  await increaseOrder();
-  const profiles =
-    (await Array.fromAsync(group.map(async (id) => await getProfile(id))))
-      .filter((e) => e !== null);
-  const text = profiles.length
-    ? `Сегодня дежурят:\n${
-      profiles.map((p) => `${p.firstName} ${p.lastName}`).join("\n")
-    }`
-    : "Сегодня дежурных нет";
+// Publishes the sign-up post and the duty list, then advances the rotation.
+export const dailyPost = async () => {
+  // Enabled by default; only an explicit /stop turns posting off.
+  if ((await kv.get<boolean>(["open"])).value === false) return;
+
+  const group = (await currentGroup())?.members || [];
+  await advanceOrder();
+  const text = await dutyText(group);
 
   for (const channel of await listChannels()) {
-    // 1. пост записи в столовую
     try {
       const now = new Date();
       const post = await bot.api.sendMessage(channel.id, "post");
@@ -150,59 +142,54 @@ export const dailyPost = async () => {
           now.toLocaleDateString("ru", { timeZone: "Asia/Yekaterinburg" })
         }`,
         date: now,
-        // время закрытия ставится сразу при создании — отдельным шагом
-        // оно могло не записаться, и запись висела бы открытой вечно
         closeAt: now.getTime() + REG_WINDOW,
       });
       await updatePost(postId);
-      console.log(`channel ${channel.id}: столовая OK`);
+      console.log(`channel ${channel.id}: sign-up post ok`);
     } catch (err) {
-      console.error(`channel ${channel.id}: столовая упала:`, err);
+      console.error(`channel ${channel.id}: sign-up post failed:`, err);
     }
 
-    // 2. список дежурных — отдельным try, чтобы не зависеть от первого
+    // Separate try so a failure above still lets the duty list through.
     try {
-      await new Promise((r) => setTimeout(r, 3000)); // пауза против flood control
+      await new Promise((r) => setTimeout(r, 3000)); // avoid flood control
       await bot.api.sendMessage(channel.id, text);
-      console.log(`channel ${channel.id}: дежурство OK`);
+      console.log(`channel ${channel.id}: duty list ok`);
     } catch (err) {
-      console.error(`channel ${channel.id}: дежурство упало:`, err);
+      console.error(`channel ${channel.id}: duty list failed:`, err);
     }
   }
 };
 
-// дни недели числами: Deploy не принимает MON-SAT
+// Numeric weekdays: Deno Deploy rejects MON-SAT.
 Deno.cron("daily entry", "15 2 * * 1-6", dailyPost);
 
-// закрытие записи: пост НЕ удаляется, а помечается закрытым,
-// иначе бот теряет над ним контроль и список нельзя починить
+// Marks the post closed instead of deleting it, so bans and profile removals
+// can still correct the published list afterwards.
 export const closePost = async (postId: string) => {
   const post = await getPost(postId);
   if (!post || post.closed) return;
 
-  // итог уходит владельцу и только ему: получателя больше нельзя
-  // переназначить через базу, он берётся из OWNER_ID
   if (OWNER_ID) {
     try {
       await bot.api.forwardMessage(OWNER_ID, post.channel_id, post.message_id);
     } catch (err) {
-      // не смогли переслать владельцу — это не повод не закрывать запись
-      console.error(`post ${postId}: пересылка владельцу не прошла:`, err);
+      console.error(`post ${postId}: forward to owner failed:`, err);
     }
   }
 
-  // lastText сбрасываем, чтобы гарантированно перерисовать с замком
+  // Clearing lastText forces the re-render that swaps in the lock button.
   await savePost(postId, { ...post, closed: true, lastText: undefined });
   await updatePost(postId);
 };
 
-// вместо kv.listenQueue: KV Connect на Deno Deploy не поддерживает очереди
+// Replaces kv.enqueue/listenQueue: KV Connect on Deno Deploy has no queues.
 Deno.cron("close posts", "*/5 * * * *", async () => {
   for (const post of await listPosts()) {
     try {
       if (!post.closed && isClosed(post)) {
         await closePost(post.id);
-        console.log(`post ${post.id}: запись закрыта`);
+        console.log(`post ${post.id}: closed`);
         continue;
       }
       if (
@@ -211,10 +198,10 @@ Deno.cron("close posts", "*/5 * * * *", async () => {
       ) {
         await removeEntries(post.id);
         await deletePost(post.id);
-        console.log(`post ${post.id}: удалён из базы`);
+        console.log(`post ${post.id}: purged`);
       }
     } catch (err) {
-      console.error(`post ${post.id}: ошибка обслуживания:`, err);
+      console.error(`post ${post.id}: maintenance failed:`, err);
     }
   }
 });

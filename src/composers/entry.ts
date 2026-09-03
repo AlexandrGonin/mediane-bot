@@ -15,6 +15,7 @@ const CLOSED_ALERT = {
 const NOT_REGISTERED =
   "Ты не зарегистрирован в системе! Зарегистрируйся через /register";
 
+// Entered through the deep link on the channel post button.
 entryComposer.chatType("private").command("start", async (ctx) => {
   const postId = ctx.match;
   if (!postId || !isValidPostId(postId)) {
@@ -35,7 +36,6 @@ entryComposer.chatType("private").command("start", async (ctx) => {
   }
 
   const entry = await getEntry(postId, ctx.from.id);
-
   const reply_markup = new InlineKeyboard();
   if (isClosed(post)) {
     reply_markup.text("Запись закрыта 🔒", "closed");
@@ -74,7 +74,7 @@ entryComposer.chatType("private").callbackQuery(/^add:/, async (ctx) => {
   const entry = await getEntry(postId, ctx.from.id);
   await setEntry(postId, ctx.from.id);
 
-  // перепроверка: между проверкой выше и записью пост мог закрыться
+  // The post may have closed between the check above and the write.
   const fresh = await getPost(postId);
   if (!fresh || isClosed(fresh)) {
     await removeEntry(postId, ctx.from.id);
@@ -83,16 +83,13 @@ entryComposer.chatType("private").callbackQuery(/^add:/, async (ctx) => {
     return;
   }
 
-  await ctx.editMessageText(
-    `<b>Записан ✅</b>\n${post.name}`,
-    {
-      parse_mode: "HTML",
-      reply_markup: new InlineKeyboard().text(
-        "Отменить запись",
-        `remove:${postId}`,
-      ),
-    },
-  );
+  await ctx.editMessageText(`<b>Записан ✅</b>\n${post.name}`, {
+    parse_mode: "HTML",
+    reply_markup: new InlineKeyboard().text(
+      "Отменить запись",
+      `remove:${postId}`,
+    ),
+  });
   await ctx.answerCallbackQuery({ text: "Теперь ты записан." });
   if (!entry) await updatePost(postId);
 });
@@ -120,13 +117,10 @@ entryComposer.chatType("private").callbackQuery(/^remove:/, async (ctx) => {
   const entry = await getEntry(postId, ctx.from.id);
   await removeEntry(postId, ctx.from.id);
 
-  await ctx.editMessageText(
-    `<b>Не записан 🚫</b>\n${post.name}`,
-    {
-      parse_mode: "HTML",
-      reply_markup: new InlineKeyboard().text("Записаться", `add:${postId}`),
-    },
-  );
+  await ctx.editMessageText(`<b>Не записан 🚫</b>\n${post.name}`, {
+    parse_mode: "HTML",
+    reply_markup: new InlineKeyboard().text("Записаться", `add:${postId}`),
+  });
   await ctx.answerCallbackQuery({ text: "Ты больше не записан." });
   if (entry) await updatePost(postId);
 });

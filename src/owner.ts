@@ -1,5 +1,6 @@
-// Никаких импортов в этом файле — он подключается из mod.ts и из композеров,
-// и любой импорт превратил бы это в цикл, который падает на старте.
+// Single source of admin authority. Kept free of imports on purpose: mod.ts
+// and the composers all read it, and any import here would close a cycle that
+// crashes on startup.
 export const OWNER_ID = Number(Deno.env.get("OWNER_ID"));
 
 export const isOwner = (ctx: { from?: { id: number } }) =>

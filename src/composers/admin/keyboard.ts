@@ -6,13 +6,12 @@ import { getGroups, setGroups } from "../../db/duty.ts";
 
 export const keyboardComposer = new Composer<BotContext>();
 
-// сколько кнопок с людьми помещать в один ряд клавиатуры
-// поставь 1, если длинные имена всё ещё обрезаются
+// People buttons per keyboard row. Set to 1 if long names still get cut.
 const PER_ROW = 2;
-// Telegram не примет клавиатуру бесконечного размера
+// Telegram will not accept an unbounded keyboard.
 const MAX_GROUPS = 40;
 
-// расписание правит только владелец
+// Schedule editing is owner-only.
 const owner = keyboardComposer.chatType("private").filter(isOwner);
 
 owner.command("schedule", async (ctx) => {
@@ -32,7 +31,7 @@ owner.command("schedule", async (ctx) => {
   });
 });
 
-// индексы приходят из callback_data — их нельзя считать корректными
+// Indices arrive in callback data and cannot be trusted.
 const cell = (schedule: number[][], row: unknown, idx: unknown) =>
   typeof row === "number" && typeof idx === "number" &&
   Number.isInteger(row) && Number.isInteger(idx) &&
@@ -124,7 +123,7 @@ owner.callbackQuery(/^ins-[0-9]+$/, async (ctx) => {
   await ctx.answerCallbackQuery();
 });
 
-// удаление пустой группы
+// Deleting an empty group.
 owner.callbackQuery(/^rm-[0-9]+$/, async (ctx) => {
   const schedule = ctx.session.schedule;
   const rowPos = Number(ctx.callbackQuery.data.split("-")[1]);
@@ -186,7 +185,7 @@ const makeGroupKeyboard = async (groups: number[][]) => {
     let inRow = 0;
     for (const [idx2, id] of group.entries()) {
       const profile = await getProfile(id);
-      if (!profile) continue; // idx2 остаётся индексом в исходной группе
+      if (!profile) continue; // keep idx2 aligned with the stored group
       keyboard.text(
         `${profile.firstName} ${profile.lastName}`,
         `${idx1}-${idx2}`,

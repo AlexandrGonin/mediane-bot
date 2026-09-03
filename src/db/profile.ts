@@ -20,7 +20,8 @@ export const MAX_NAME = 32;
 
 export const normalizeName = (s: string) => s.trim().toLocaleLowerCase("ru");
 
-// приводим ввод пользователя к безопасному виду; null = ввод не годится
+// Names reach the channel post, which is sent with parse_mode HTML, and they
+// must fit a message. Returns null when the input is unusable.
 export const cleanName = (raw: unknown) => {
   if (typeof raw !== "string") return null;
   const value = raw.replace(/\s+/gu, " ").trim();
@@ -32,6 +33,8 @@ export const cleanName = (raw: unknown) => {
 const isProfile = (p: unknown): p is Profile =>
   !!p && typeof (p as Profile).firstName === "string" &&
   typeof (p as Profile).lastName === "string";
+
+// --- profiles ---
 
 export const getProfile = async (id: unknown) => {
   if (!isValidUserId(id)) return null;
@@ -67,11 +70,12 @@ export const listProfiles = async () =>
 
 export const getIds = async () => (await listProfiles()).map((p) => p.id);
 
-// профили одним запросом — чтобы не делать N обращений на каждую перерисовку
+// One read for every profile, reused across a whole render pass.
 export const profileMap = async () =>
   new Map((await listProfiles()).map((p) => [p.id, p as Profile]));
 
-// ищем ТОЛЬКО по фамилии — иначе фамилию вида "2" не найти
+// Lookup is by surname only. Matching numeric input as an id would make a
+// person whose surname is "2" unreachable.
 export const findByLastName = async (lastName: string) => {
   const needle = normalizeName(lastName);
   if (!needle) return [];
@@ -80,13 +84,12 @@ export const findByLastName = async (lastName: string) => {
   );
 };
 
-export const sorting = (profile1: Profile, profile2: Profile) => {
-  return (profile1.lastName != profile2.lastName)
-    ? profile1.lastName.localeCompare(profile2.lastName)
-    : profile1.firstName.localeCompare(profile2.firstName);
-};
+export const sorting = (a: Profile, b: Profile) =>
+  a.lastName != b.lastName
+    ? a.lastName.localeCompare(b.lastName)
+    : a.firstName.localeCompare(b.firstName);
 
-// ---------- баны ----------
+// --- bans ---
 
 export const isBanned = async (id: unknown) => {
   if (!isValidUserId(id)) return false;
@@ -111,7 +114,8 @@ export const listBans = async () =>
     .filter((e) => isValidUserId(e.id) && !!e.value)
     .map((e) => ({ id: e.id, ...e.value }));
 
-// ищем по списку банов, а не по профилям: профиль мог быть удалён
+// Searches the ban records rather than profiles: a banned person may have had
+// their profile deleted, and they still need to be unbannable by name.
 export const findBansByLastName = async (lastName: string) => {
   const needle = normalizeName(lastName);
   if (!needle) return [];

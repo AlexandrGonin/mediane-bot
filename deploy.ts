@@ -1,13 +1,13 @@
 import { webhookCallback } from "grammy";
 import { bot } from "./src/mod.ts";
 
-// Telegram присылает этот секрет в заголовке каждого апдейта.
-// Без него ручку /bot может дёргать кто угодно, притворяясь любым user_id.
+// Telegram signs every update with this secret. Without it the /bot endpoint
+// accepts anything, including a forged update claiming to be the owner.
 const SECRET = Deno.env.get("WEBHOOK_SECRET") || "";
 if (!SECRET) {
   console.error(
-    "WEBHOOK_SECRET не задан — вебхук будет отклонять все запросы. " +
-      "Задай переменную: только A-Z a-z 0-9 _ -, от 1 до 256 символов.",
+    "WEBHOOK_SECRET is unset — the webhook will reject every request. " +
+      "Set it to 1-256 characters from [A-Za-z0-9_-].",
   );
 }
 

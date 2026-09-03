@@ -6,19 +6,19 @@ export interface Post {
   channel_id: number;
   message_id: number;
   date: Date;
-  closeAt: number; // обязательное: момент, после которого запись не принимается
-  closed?: boolean; // замок уже повешен кроном
-  lastText?: string; // что последний раз отрисовано в канале
+  closeAt: number;
+  closed?: boolean;
+  lastText?: string;
 }
 
-// id поста приходит из deep-link и callback_data, то есть напрямую от юзера.
-// nanoid по умолчанию 21 символ из [A-Za-z0-9_-].
+// Post ids travel through deep links and callback data, so they arrive as
+// untrusted input. nanoid emits 21 chars from [A-Za-z0-9_-].
 export const isValidPostId = (id: unknown): id is string =>
   typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 
-// ЕДИНСТВЕННАЯ правда о том, открыта ли запись.
-// Не полагается на флаг closed: если крон опоздал или не отработал,
-// время всё равно решает. Битый/отсутствующий closeAt = закрыто.
+// The only authority on whether sign-up is still accepted. Deliberately not
+// driven by the `closed` flag alone: a cron that runs late, or never, must not
+// be able to leave a post open. A missing or malformed closeAt reads as closed.
 export const isClosed = (post: Post) =>
   post.closed === true ||
   !(typeof post.closeAt === "number" && post.closeAt > Date.now());
