@@ -1,6 +1,6 @@
 import { Composer, Context, InlineKeyboard } from "grammy";
 import { checkChannel, requestPostClose } from "../db/channel.ts";
-import { getPost, Post, setPost } from "../db/post.ts";
+import { getPost, listPosts, Post, savePost, setPost } from "../db/post.ts";
 import { bot } from "../mod.ts";
 import { listEntries } from "../db/entry.ts";
 import { getProfile, sorting } from "../db/profile.ts";
@@ -11,6 +11,11 @@ export const channelComposer = new Composer();
 const check = async (ctx: Context) =>
   ctx.chat?.type == "channel" &&
   (await checkChannel(ctx.chat.id));
+
+// bot.botInfo недоступен, пока бот не проинициализирован (например в кроне),
+// поэтому имя берём через getMe и кешируем на время жизни изолята
+let botName: string | undefined;
+const getBotName = async () => botName ??= (await bot.api.getMe()).username;
 
 channelComposer.filter(check).command("post", async (ctx) => {
   const delay = 3 * 60 * 60 * 1000;
@@ -31,41 +36,58 @@ channelComposer.filter(check).command("post", async (ctx) => {
       ),
     date: now,
   } as Post);
+  await updatePost(postId);
   await requestPostClose(postId, delay);
-  const reply_markup = new InlineKeyboard()
-    .url(
-      "Запись в боте",
-      `https://t.me/${bot.botInfo.username}?start=${postId}`,
-    );
-  await ctx.editMessageText(await generatePostText(postId), {
-    reply_markup,
-    parse_mode: "HTML",
-  });
 });
 
 channelComposer.filter(check).command("duty", async (ctx) => {
-  const group = (await getCurrentGroup())?.members || []; 
+  const group = (await getCurrentGroup())?.members || [];
   await increaseOrder();
-  const profiles = (await Array.fromAsync(group.map(async (id) => await getProfile(id)))).filter((e) => e !== null);
-  const text = `Сегодня дежурят:\n${profiles.map((profile) => `${profile.firstName} ${profile.lastName}`).join('\n')}`
+  const profiles =
+    (await Array.fromAsync(group.map(async (id) => await getProfile(id))))
+      .filter((e) => e !== null);
+  const text = `Сегодня дежурят:\n${
+    profiles.map((profile) => `${profile.firstName} ${profile.lastName}`).join(
+      "\n",
+    )
+  }`;
   await ctx.editMessageText(text);
 });
+
+// единая точка отрисовки поста: не дёргает Telegram, если текст не изменился
+export const renderPost = async (id: string, post: Post) => {
+  const text = await generatePostText(id);
+  if (post.lastText === text) return;
+
+  const reply_markup = new InlineKeyboard().url(
+    "Запись в боте",
+    `https://t.me/${await getBotName()}?start=${id}`,
+  );
+  try {
+    await bot.api.editMessageText(
+      post.channel_id,
+      post.message_id,
+      text,
+      { reply_markup, parse_mode: "HTML" },
+    );
+    await savePost(id, { ...post, lastText: text });
+  } catch (err) {
+    console.error(`post ${id}: обновление не прошло:`, err);
+  }
+};
 
 export const updatePost = async (postId: string) => {
   const post = await getPost(postId);
   if (!post) return;
+  await renderPost(postId, post);
+};
 
-  const reply_markup = new InlineKeyboard()
-    .url(
-      "Запись в боте",
-      `https://t.me/${bot.botInfo.username}?start=${postId}`,
-    );
-  await bot.api.editMessageText(
-    post.channel_id,
-    post.message_id,
-    await generatePostText(postId),
-    { reply_markup, parse_mode: "HTML" },
-  );
+// прогон по всем открытым постам — вызывается после любого действия с ботом
+export const refreshPosts = async () => {
+  for (const post of await listPosts()) {
+    const { id, ...data } = post;
+    await renderPost(id, data as Post);
+  }
 };
 
 export const generatePostText = async (postId: string) => {
