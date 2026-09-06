@@ -162,7 +162,7 @@ export const dailyPost = async () => {
 };
 
 // Numeric weekdays: Deno Deploy rejects MON-SAT.
-Deno.cron("daily entry", "15 2 * * 1-6", dailyPost);
+Deno.cron("daily entry", "15 2 * * 2-7", dailyPost);
 
 // Marks the post closed instead of deleting it, so bans and profile removals
 // can still correct the published list afterwards.
@@ -184,7 +184,7 @@ export const closePost = async (postId: string) => {
 };
 
 // Replaces kv.enqueue/listenQueue: KV Connect on Deno Deploy has no queues.
-Deno.cron("close posts", "*/5 * * * *", async () => {
+Deno.cron("close posts", "*/15 * * * *", async () => {
   for (const post of await listPosts()) {
     try {
       if (!post.closed && isClosed(post)) {
