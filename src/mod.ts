@@ -114,6 +114,20 @@ bot.chatType("private").filter(isOwner).command("open", async (ctx) => {
   await ctx.reply("Автопостинг включён");
 });
 
+// The duty list has its own switch, independent of the canteen post.
+bot.chatType("private").filter(isOwner).command("dutyoff", async (ctx) => {
+  await kv.set(["duty"], false);
+  await ctx.reply(
+    "Дежурства больше не публикуются, столовая продолжает работать.\n" +
+      "Очередь стоит на месте. Включить обратно: /dutyon",
+  );
+});
+
+bot.chatType("private").filter(isOwner).command("dutyon", async (ctx) => {
+  await kv.set(["duty"], true);
+  await ctx.reply("Дежурства снова публикуются");
+});
+
 bot.use(keyboardComposer);
 bot.use(utilComposer);
 bot.use(registryComposer);
@@ -127,9 +141,13 @@ export const dailyPost = async () => {
   // Enabled by default; only an explicit /stop turns posting off.
   if ((await kv.get<boolean>(["open"])).value === false) return;
 
-  const group = (await currentGroup())?.members || [];
-  await advanceOrder();
-  const text = await dutyText(group);
+  // The duty list is switched separately, and while it is off the rotation
+  // stays put: advancing it would silently skip groups for every day the
+  // list was not published.
+  const dutyEnabled = (await kv.get<boolean>(["duty"])).value !== false;
+  const group = dutyEnabled ? (await currentGroup())?.members || [] : [];
+  if (dutyEnabled && group.length) await advanceOrder();
+  const dutyMessage = dutyEnabled && group.length ? await dutyText(group) : null;
 
   for (const channel of await listChannels()) {
     try {
@@ -150,10 +168,12 @@ export const dailyPost = async () => {
       console.error(`channel ${channel.id}: sign-up post failed:`, err);
     }
 
+    if (!dutyMessage) continue;
+
     // Separate try so a failure above still lets the duty list through.
     try {
       await new Promise((r) => setTimeout(r, 3000)); // avoid flood control
-      await bot.api.sendMessage(channel.id, text);
+      await bot.api.sendMessage(channel.id, dutyMessage);
       console.log(`channel ${channel.id}: duty list ok`);
     } catch (err) {
       console.error(`channel ${channel.id}: duty list failed:`, err);

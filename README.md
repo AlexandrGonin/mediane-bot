@@ -81,7 +81,8 @@ Gated on `OWNER_ID`; the bot does not respond to anyone else.
 | `/rename <surname> <new name> <new surname>` | Rename a profile. |
 | `/add <channelId>` | Allow a channel (negative id). |
 | `/close <postId>` | Close a sign-up early. |
-| `/open`, `/stop` | Enable or disable the morning post. Enabled by default. |
+| `/open`, `/stop` | Enable or disable the whole morning run. Enabled by default. |
+| `/dutyon`, `/dutyoff` | Enable or disable only the duty list, leaving the canteen post alone. Enabled by default. |
 | `/cron` | Publish immediately, exactly as the morning job does. Advances the rotation. |
 
 Surname lookup is case-insensitive and never interpreted as an id, so a
@@ -296,7 +297,8 @@ All state lives in Deno KV.
 | `["order"]` | `number` | Index of the group up next. |
 | `["ban", userId]` | `{ firstName, lastName, at }` | Name is a snapshot; it survives profile deletion. |
 | `["channel", channelId]` | `boolean` | Allowed channels. |
-| `["open"]` | `boolean` | Only `false` disables posting; absent means enabled. |
+| `["open"]` | `boolean` | Only `false` disables the morning run; absent means enabled. |
+| `["duty"]` | `boolean` | Only `false` disables the duty list; absent means enabled. |
 
 Sign-up is closed by time, not by a flag:
 
