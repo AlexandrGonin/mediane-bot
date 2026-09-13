@@ -181,8 +181,27 @@ export const dailyPost = async () => {
   }
 };
 
-// Numeric weekdays: Deno Deploy rejects MON-SAT.
-Deno.cron("daily entry", "15 2 * * 1-6", dailyPost);
+// Weekday gating is done here, not in the cron expression. The weekday field
+// does not map to the usual 0=Sunday convention on every runtime, and getting
+// it wrong shifts the whole week by a day. The cron fires daily and the check
+// below decides, using the calendar the posts are actually written for.
+const TIMEZONE = "Asia/Yekaterinburg";
+const WORK_DAYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+
+export const weekdayIn = (timeZone: string, date = new Date()) =>
+  new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(date);
+
+export const isWorkday = (date = new Date()) =>
+  WORK_DAYS.has(weekdayIn(TIMEZONE, date));
+
+Deno.cron("daily entry", "15 2 * * *", async () => {
+  const weekday = weekdayIn(TIMEZONE, new Date());
+  if (!WORK_DAYS.has(weekday)) {
+    console.log(`daily entry: ${weekday} is a day off, nothing published`);
+    return;
+  }
+  await dailyPost();
+});
 
 // Marks the post closed instead of deleting it, so bans and profile removals
 // can still correct the published list afterwards.

@@ -227,12 +227,20 @@ warm the cache with `deno cache dev.ts` beforehand.
 
 | Job | Schedule (UTC) | Purpose |
 | --- | --- | --- |
-| `daily entry` | `15 2 * * 1-6` | Publish the sign-up post and duty list. |
+| `daily entry` | `15 2 * * *` | Publish the sign-up post and duty list, Mon-Sat only. |
 | `close posts` | `*/5 * * * *` | Close due posts, purge posts older than three days. |
 
 Cron runs in UTC on both targets, while dates in the post are formatted for
-`Asia/Yekaterinburg` — 02:15 UTC is 07:15 there. Numeric weekdays are required:
-Deno Deploy rejects `MON-SAT`.
+`Asia/Yekaterinburg` — 02:15 UTC is 07:15 there.
+
+`daily entry` fires every day and decides in code whether to publish. The
+weekday field of a cron expression is not portable: the `1-6` that should mean
+Mon-Sat was observed behaving as Sun-Fri on Deno Deploy, shifting the whole
+week by a day. `isWorkday()` instead asks `Intl.DateTimeFormat` for the weekday
+in `Asia/Yekaterinburg` and publishes only on Mon, Tue, Wed, Thu, Fri and Sat.
+On Sunday it logs one line and posts nothing.
+
+Manual `/cron` deliberately skips this check, so a trial run works any day.
 
 ---
 
