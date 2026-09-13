@@ -81,7 +81,8 @@ Gated on `OWNER_ID`; the bot does not respond to anyone else.
 | `/rename <surname> <new name> <new surname>` | Rename a profile. |
 | `/add <channelId>` | Allow a channel (negative id). |
 | `/close <postId>` | Close a sign-up early. |
-| `/open`, `/stop` | Enable or disable the morning post. Enabled by default. |
+| `/open`, `/stop` | Enable or disable the whole morning run. Enabled by default. |
+| `/dutyon`, `/dutyoff` | Enable or disable only the duty list, leaving the canteen post alone. Enabled by default. |
 | `/cron` | Publish immediately, exactly as the morning job does. Advances the rotation. |
 
 Surname lookup is case-insensitive and never interpreted as an id, so a
@@ -226,12 +227,20 @@ warm the cache with `deno cache dev.ts` beforehand.
 
 | Job | Schedule (UTC) | Purpose |
 | --- | --- | --- |
-| `daily entry` | `15 2 * * 1-6` | Publish the sign-up post and duty list. |
+| `daily entry` | `15 2 * * *` | Publish the sign-up post and duty list, Mon-Sat only. |
 | `close posts` | `*/5 * * * *` | Close due posts, purge posts older than three days. |
 
 Cron runs in UTC on both targets, while dates in the post are formatted for
-`Asia/Yekaterinburg` — 02:15 UTC is 07:15 there. Numeric weekdays are required:
-Deno Deploy rejects `MON-SAT`.
+`Asia/Yekaterinburg` — 02:15 UTC is 07:15 there.
+
+`daily entry` fires every day and decides in code whether to publish. The
+weekday field of a cron expression is not portable: the `1-6` that should mean
+Mon-Sat was observed behaving as Sun-Fri on Deno Deploy, shifting the whole
+week by a day. `isWorkday()` instead asks `Intl.DateTimeFormat` for the weekday
+in `Asia/Yekaterinburg` and publishes only on Mon, Tue, Wed, Thu, Fri and Sat.
+On Sunday it logs one line and posts nothing.
+
+Manual `/cron` deliberately skips this check, so a trial run works any day.
 
 ---
 
@@ -296,7 +305,8 @@ All state lives in Deno KV.
 | `["order"]` | `number` | Index of the group up next. |
 | `["ban", userId]` | `{ firstName, lastName, at }` | Name is a snapshot; it survives profile deletion. |
 | `["channel", channelId]` | `boolean` | Allowed channels. |
-| `["open"]` | `boolean` | Only `false` disables posting; absent means enabled. |
+| `["open"]` | `boolean` | Only `false` disables the morning run; absent means enabled. |
+| `["duty"]` | `boolean` | Only `false` disables the duty list; absent means enabled. |
 
 Sign-up is closed by time, not by a flag:
 
