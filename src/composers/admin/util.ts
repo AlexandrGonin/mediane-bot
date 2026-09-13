@@ -1,5 +1,12 @@
 import { Composer, InlineKeyboard } from "grammy";
-import { BotContext, closePost, dailyPost } from "../../mod.ts";
+import {
+  BotContext,
+  closePost,
+  dailyPost,
+  isWorkday,
+  TIMEZONE,
+  weekdayIn,
+} from "../../mod.ts";
 import { isOwner, OWNER_ID } from "../../owner.ts";
 import { isValidChannelId, setChannel } from "../../db/channel.ts";
 import { isValidPostId, listPosts } from "../../db/post.ts";
@@ -41,6 +48,30 @@ const parseStep = (raw: string) => {
   const n = Number(value);
   return Number.isInteger(n) && n >= 0 && n <= MAX_STEP ? n : null;
 };
+
+// --- diagnostics ---
+
+// Shows what the cron's own weekday check decides for the coming week, so a
+// timezone or day-of-week mistake is visible without waiting for Sunday.
+owner.command("weekday", async (ctx) => {
+  const now = new Date();
+  const rows: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
+    const date = day.toLocaleDateString("ru", { timeZone: TIMEZONE });
+    const mark = isWorkday(day) ? "пост будет" : "молчит";
+    rows.push(
+      `${i === 0 ? "сегодня" : "        "} ${date} ${
+        weekdayIn(TIMEZONE, day)
+      } — ${mark}`,
+    );
+  }
+  await ctx.reply(
+    `Пояс: ${TIMEZONE}\nСейчас там: ${
+      now.toLocaleString("ru", { timeZone: TIMEZONE })
+    }\n\n${rows.join("\n")}`,
+  );
+});
 
 // --- duty queue ---
 

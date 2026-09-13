@@ -185,7 +185,7 @@ export const dailyPost = async () => {
 // does not map to the usual 0=Sunday convention on every runtime, and getting
 // it wrong shifts the whole week by a day. The cron fires daily and the check
 // below decides, using the calendar the posts are actually written for.
-const TIMEZONE = "Asia/Yekaterinburg";
+export const TIMEZONE = "Asia/Yekaterinburg";
 const WORK_DAYS = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
 
 export const weekdayIn = (timeZone: string, date = new Date()) =>

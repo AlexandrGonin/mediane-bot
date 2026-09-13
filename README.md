@@ -71,6 +71,7 @@ Gated on `OWNER_ID`; the bot does not respond to anyone else.
 | Command | Effect |
 | --- | --- |
 | `/current` | Who is on duty under the next post, with their position in the rotation. |
+| `/weekday` | Seven-day preview of the cron's weekday decision, for checking the timezone gate. |
 | `/roll [n]` | Advance the rotation by `n` live groups (default 1). |
 | `/rollback [n]` | Move the rotation back by `n` live groups (default 1). |
 | `/schedule` | Interactive editor for duty groups. |
