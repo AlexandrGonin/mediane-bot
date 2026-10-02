@@ -1,9 +1,13 @@
 import { Composer, InlineKeyboard } from "grammy";
 import {
   BotContext,
+  channelsPostedToday,
   closePost,
   dailyPost,
+  DUTY_ENV_OFF,
+  INSTANCE,
   isWorkday,
+  kv,
   TIMEZONE,
   weekdayIn,
 } from "../../mod.ts";
@@ -11,7 +15,12 @@ import { isOwner, OWNER_ID } from "../../owner.ts";
 import { isValidChannelId, setChannel } from "../../db/channel.ts";
 import { isValidPostId, listPosts } from "../../db/post.ts";
 import { isValidUserId, removeEntry } from "../../db/entry.ts";
-import { currentGroup, dutyNames, liveGroups, shiftOrder } from "../../db/duty.ts";
+import {
+  currentGroup,
+  dutyNames,
+  liveGroups,
+  shiftOrder,
+} from "../../db/duty.ts";
 import {
   Ban,
   cleanName,
@@ -114,7 +123,10 @@ owner.command("rollback", async (ctx) => {
 // --- bans ---
 
 const banUser = async (id: number, firstName: string, lastName: string) => {
-  await setBan(id, { firstName, lastName, at: new Date().toISOString() } as Ban);
+  await setBan(
+    id,
+    { firstName, lastName, at: new Date().toISOString() } as Ban,
+  );
   await dropEntries(id);
 };
 
@@ -215,7 +227,9 @@ owner.command("banlist", async (ctx) => {
   }
   const lines = bans.map((b) =>
     `${b.firstName} ${b.lastName} — ${
-      new Date(b.at).toLocaleDateString("ru", { timeZone: "Asia/Yekaterinburg" })
+      new Date(b.at).toLocaleDateString("ru", {
+        timeZone: "Asia/Yekaterinburg",
+      })
     }`
   );
   await ctx.reply(`Заблокированы (${bans.length}):\n${lines.join("\n")}`);
@@ -333,7 +347,9 @@ owner.callbackQuery(/^ren:/, async (ctx) => {
     return;
   }
   if (!pending) {
-    await ctx.editMessageText("Забыл, на что переименовывать — повтори /rename");
+    await ctx.editMessageText(
+      "Забыл, на что переименовывать — повтори /rename",
+    );
     await ctx.answerCallbackQuery();
     return;
   }
@@ -382,9 +398,43 @@ owner.command("close", async (ctx) => {
 
 // Publishes the same thing the morning cron does, including the queue step.
 owner.command("cron", async (ctx) => {
+  const force = ctx.match.trim() === "force";
+  if (!force && (await channelsPostedToday()).size) {
+    await ctx.reply(
+      "На сегодня пост уже есть — повторно публиковать не буду.\n" +
+        "Если точно надо: /cron force",
+    );
+    return;
+  }
   await ctx.reply("Публикую как утренний крон…");
-  await dailyPost();
+  await dailyPost(force);
   await ctx.reply(
     `Готово. Очередь сдвинулась на 1 — вернуть можно /rollback 1\n\n${await describeGroup()}`,
+  );
+});
+
+// Tells apart the instance answering commands from the one writing to the
+// channel. If the id here differs from the id in the publishing log lines,
+// a second instance is running and the fix belongs in the dashboard.
+owner.command("instance", async (ctx) => {
+  const dutyKv = (await kv.get<boolean>(["duty"])).value;
+  const openKv = (await kv.get<boolean>(["open"])).value;
+  const postedToday = [...await channelsPostedToday()];
+  await ctx.reply(
+    [
+      `Экземпляр: ${INSTANCE}`,
+      `Регион: ${Deno.env.get("DENO_REGION") ?? "-"}`,
+      ``,
+      `DUTY в окружении: ${Deno.env.get("DUTY") ?? "(не задан)"}`,
+      `duty в базе: ${dutyKv === undefined ? "(нет ключа)" : String(dutyKv)}`,
+      `open в базе: ${openKv === undefined ? "(нет ключа)" : String(openKv)}`,
+      `Дежурства сейчас: ${
+        DUTY_ENV_OFF || dutyKv === false ? "выключены" : "включены"
+      }`,
+      ``,
+      `Каналы с постом за сегодня: ${
+        postedToday.length ? postedToday.join(", ") : "нет"
+      }`,
+    ].join("\n"),
   );
 });

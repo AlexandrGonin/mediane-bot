@@ -34,8 +34,8 @@ Built on [grammY](https://grammy.dev) and Deno KV, with no external database.
 **07:15 local time, Monday to Saturday** (02:15 UTC, see
 [Scheduled jobs](#scheduled-jobs)):
 
-1. For each allowed channel the bot posts a placeholder, records it in KV with
-   a close time three hours out, then rewrites it into the sign-up post with an
+1. For each allowed channel the bot posts a placeholder, records it in KV with a
+   close time three hours out, then rewrites it into the sign-up post with an
    inline button.
 2. It posts the duty group for the day and advances the rotation by one.
 
@@ -56,11 +56,11 @@ are deleted.
 
 ### Anyone
 
-| Command | Effect |
-| --- | --- |
-| `/register` | Create a profile: given name, surname, free/paying. Required before signing up. |
-| `/start <postId>` | Opened by the channel button. Shows attendance for that post with a toggle. |
-| `/cancel` | Clear the current dialogue state. |
+| Command           | Effect                                                                          |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `/register`       | Create a profile: given name, surname, free/paying. Required before signing up. |
+| `/start <postId>` | Opened by the channel button. Shows attendance for that post with a toggle.     |
+| `/cancel`         | Clear the current dialogue state.                                               |
 
 A person can only ever change their own profile and their own attendance.
 
@@ -68,37 +68,38 @@ A person can only ever change their own profile and their own attendance.
 
 Gated on `OWNER_ID`; the bot does not respond to anyone else.
 
-| Command | Effect |
-| --- | --- |
-| `/current` | Who is on duty under the next post, with their position in the rotation. |
-| `/weekday` | Seven-day preview of the cron's weekday decision, for checking the timezone gate. |
-| `/roll [n]` | Advance the rotation by `n` live groups (default 1). |
-| `/rollback [n]` | Move the rotation back by `n` live groups (default 1). |
-| `/schedule` | Interactive editor for duty groups. |
-| `/ban <surname>` | Block a person by Telegram id and drop them from open sign-ups. |
-| `/unban <surname>` | Lift a block. |
-| `/banlist` | List blocked people with the date they were blocked. |
-| `/remove <surname>` | Delete a profile and its sign-ups. |
-| `/rename <surname> <new name> <new surname>` | Rename a profile. |
-| `/add <channelId>` | Allow a channel (negative id). |
-| `/close <postId>` | Close a sign-up early. |
-| `/open`, `/stop` | Enable or disable the whole morning run. Enabled by default. |
-| `/dutyon`, `/dutyoff` | Enable or disable only the duty list, leaving the canteen post alone. Enabled by default. |
-| `/cron` | Publish immediately, exactly as the morning job does. Advances the rotation. |
+| Command                                      | Effect                                                                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/current`                                   | Who is on duty under the next post, with their position in the rotation.                                                                          |
+| `/weekday`                                   | Seven-day preview of the cron's weekday decision, for checking the timezone gate.                                                                 |
+| `/instance`                                  | Deployment id, region, and the duty/open state as seen by the instance that answers commands.                                                     |
+| `/roll [n]`                                  | Advance the rotation by `n` live groups (default 1).                                                                                              |
+| `/rollback [n]`                              | Move the rotation back by `n` live groups (default 1).                                                                                            |
+| `/schedule`                                  | Interactive editor for duty groups.                                                                                                               |
+| `/ban <surname>`                             | Block a person by Telegram id and drop them from open sign-ups.                                                                                   |
+| `/unban <surname>`                           | Lift a block.                                                                                                                                     |
+| `/banlist`                                   | List blocked people with the date they were blocked.                                                                                              |
+| `/remove <surname>`                          | Delete a profile and its sign-ups.                                                                                                                |
+| `/rename <surname> <new name> <new surname>` | Rename a profile.                                                                                                                                 |
+| `/add <channelId>`                           | Allow a channel (negative id).                                                                                                                    |
+| `/close <postId>`                            | Close a sign-up early.                                                                                                                            |
+| `/open`, `/stop`                             | Enable or disable the whole morning run. Enabled by default.                                                                                      |
+| `/dutyon`, `/dutyoff`                        | Enable or disable only the duty list, leaving the canteen post alone. Enabled by default.                                                         |
+| `/cron`                                      | Publish immediately, exactly as the morning job does. Refuses if a post for today already exists; `/cron force` overrides. Advances the rotation. |
 
-Surname lookup is case-insensitive and never interpreted as an id, so a
-surname consisting of digits still resolves. When several people share a
-surname the bot offers a choice of buttons.
+Surname lookup is case-insensitive and never interpreted as an id, so a surname
+consisting of digits still resolves. When several people share a surname the bot
+offers a choice of buttons.
 
 ### In an allowed channel
 
 Posted as a channel message, not sent to the bot. Requires the bot to be a
 channel admin with permission to post and edit messages.
 
-| Command | Effect |
-| --- | --- |
+| Command         | Effect                                                                |
+| --------------- | --------------------------------------------------------------------- |
 | `/post [title]` | Turn the message into a sign-up post. Title defaults to today's date. |
-| `/duty` | Rewrite the message with the current duty group. Read-only. |
+| `/duty`         | Rewrite the message with the current duty group. Read-only.           |
 
 ---
 
@@ -121,12 +122,13 @@ pointer on A, /rollback 1 -> C
 pointer on A, /rollback 11 -> C         (11 mod 3 = 2 steps back)
 ```
 
-If the pointer ends up on a group that has died, the next live group takes
-over. `/roll 0` is a no-op that still reports the current state.
+If the pointer ends up on a group that has died, the next live group takes over.
+`/roll 0` is a no-op that still reports the current state.
 
 Groups are edited with `/schedule`. In the editor each row is a group: tap two
-people to swap them, tap `➕ в группу N` and then a person to move them, `⬆️ ряд`
-inserts a row above, `🗑` deletes an empty row. `Сохранить` writes the result.
+people to swap them, tap `➕ в группу N` and then a person to move them,
+`⬆️ ряд` inserts a row above, `🗑` deletes an empty row. `Сохранить` writes the
+result.
 
 ---
 
@@ -135,14 +137,15 @@ inserts a row above, `🗑` deletes an empty row. `Сохранить` writes th
 All configuration is environment variables. Nothing that grants authority is
 stored in the database.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `TOKEN` | yes | Bot token from [@BotFather](https://t.me/BotFather). |
-| `OWNER_ID` | yes | Numeric Telegram id of the single owner. Get it from [@userinfobot](https://t.me/userinfobot). |
-| `WEBHOOK_SECRET` | webhook only | Shared secret with Telegram. `[A-Za-z0-9_-]`, 1–256 characters. |
+| Variable         | Required     | Purpose                                                                                                                                                                                     |
+| ---------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TOKEN`          | yes          | Bot token from [@BotFather](https://t.me/BotFather).                                                                                                                                        |
+| `OWNER_ID`       | yes          | Numeric Telegram id of the single owner. Get it from [@userinfobot](https://t.me/userinfobot).                                                                                              |
+| `WEBHOOK_SECRET` | webhook only | Shared secret with Telegram. `[A-Za-z0-9_-]`, 1–256 characters.                                                                                                                             |
+| `DUTY`           | no           | Set to `off` to disable the duty list outright, overriding the `/dutyoff` flag. Use it when the KV flag cannot be trusted — a redeploy bound to a different database, or a second instance. |
 
-Without `OWNER_ID` every owner command is disabled. Without `WEBHOOK_SECRET`
-the webhook endpoint rejects everything with 403 — deliberately, so there is no
+Without `OWNER_ID` every owner command is disabled. Without `WEBHOOK_SECRET` the
+webhook endpoint rejects everything with 403 — deliberately, so there is no
 unauthenticated window.
 
 Generate a secret with:
@@ -175,8 +178,8 @@ with a 409 conflict.
    https://<project>.deno.dev/webhook?key=<WEBHOOK_SECRET>
    ```
 
-   A `Done. Set` response means Telegram now signs every update with the
-   secret. Repeat this whenever the secret changes.
+   A `Done. Set` response means Telegram now signs every update with the secret.
+   Repeat this whenever the secret changes.
 
 Deno Deploy's KV runs over KV Connect, which has no queue support, so post
 closing is driven by a cron rather than `kv.enqueue`.
@@ -216,30 +219,30 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-`WorkingDirectory` must be the project root: `deno.json` supplies the import
-map and the unstable flags, and `.env` is read relative to it.
+`WorkingDirectory` must be the project root: `deno.json` supplies the import map
+and the unstable flags, and `.env` is read relative to it.
 
-Resource use is modest — roughly 150–200 MB of RSS and near-zero CPU at rest.
-1 GB and one core is comfortable. The one spike is the first run, which
-downloads and type-checks the dependency graph; on a small instance add swap or
-warm the cache with `deno cache dev.ts` beforehand.
+Resource use is modest — roughly 150–200 MB of RSS and near-zero CPU at rest. 1
+GB and one core is comfortable. The one spike is the first run, which downloads
+and type-checks the dependency graph; on a small instance add swap or warm the
+cache with `deno cache dev.ts` beforehand.
 
 ### Scheduled jobs
 
-| Job | Schedule (UTC) | Purpose |
-| --- | --- | --- |
-| `daily entry` | `15 2 * * *` | Publish the sign-up post and duty list, Mon-Sat only. |
-| `close posts` | `*/5 * * * *` | Close due posts, purge posts older than three days. |
+| Job           | Schedule (UTC) | Purpose                                               |
+| ------------- | -------------- | ----------------------------------------------------- |
+| `daily entry` | `15 2 * * *`   | Publish the sign-up post and duty list, Mon-Sat only. |
+| `close posts` | `*/5 * * * *`  | Close due posts, purge posts older than three days.   |
 
 Cron runs in UTC on both targets, while dates in the post are formatted for
 `Asia/Yekaterinburg` — 02:15 UTC is 07:15 there.
 
 `daily entry` fires every day and decides in code whether to publish. The
 weekday field of a cron expression is not portable: the `1-6` that should mean
-Mon-Sat was observed behaving as Sun-Fri on Deno Deploy, shifting the whole
-week by a day. `isWorkday()` instead asks `Intl.DateTimeFormat` for the weekday
-in `Asia/Yekaterinburg` and publishes only on Mon, Tue, Wed, Thu, Fri and Sat.
-On Sunday it logs one line and posts nothing.
+Mon-Sat was observed behaving as Sun-Fri on Deno Deploy, shifting the whole week
+by a day. `isWorkday()` instead asks `Intl.DateTimeFormat` for the weekday in
+`Asia/Yekaterinburg` and publishes only on Mon, Tue, Wed, Thu, Fri and Sat. On
+Sunday it logs one line and posts nothing.
 
 Manual `/cron` deliberately skips this check, so a trial run works any day.
 
@@ -288,8 +291,8 @@ Two middleware run ahead of everything else, in order:
    post stores the text it last showed, so an unchanged post costs no Telegram
    request, and profiles are loaded once per pass rather than once per person.
 
-`src/owner.ts` deliberately imports nothing: `mod.ts` and the composers all
-read it, and an import there would close a cycle that fails at startup.
+`src/owner.ts` deliberately imports nothing: `mod.ts` and the composers all read
+it, and an import there would close a cycle that fails at startup.
 
 ---
 
@@ -297,17 +300,17 @@ read it, and an import there would close a cycle that fails at startup.
 
 All state lives in Deno KV.
 
-| Key | Value | Notes |
-| --- | --- | --- |
-| `["profile", userId]` | `{ firstName, lastName, isFree }` | Created by `/register`. |
-| `["entry", postId, userId]` | `true` | One per sign-up. |
-| `["post", postId]` | `{ name, channel_id, message_id, date, closeAt, closed?, lastText? }` | `postId` is a nanoid. |
-| `["group", n]` | `{ members: number[] }` | Duty groups in order. |
-| `["order"]` | `number` | Index of the group up next. |
-| `["ban", userId]` | `{ firstName, lastName, at }` | Name is a snapshot; it survives profile deletion. |
-| `["channel", channelId]` | `boolean` | Allowed channels. |
-| `["open"]` | `boolean` | Only `false` disables the morning run; absent means enabled. |
-| `["duty"]` | `boolean` | Only `false` disables the duty list; absent means enabled. |
+| Key                         | Value                                                                 | Notes                                                        |
+| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `["profile", userId]`       | `{ firstName, lastName, isFree }`                                     | Created by `/register`.                                      |
+| `["entry", postId, userId]` | `true`                                                                | One per sign-up.                                             |
+| `["post", postId]`          | `{ name, channel_id, message_id, date, closeAt, closed?, lastText? }` | `postId` is a nanoid.                                        |
+| `["group", n]`              | `{ members: number[] }`                                               | Duty groups in order.                                        |
+| `["order"]`                 | `number`                                                              | Index of the group up next.                                  |
+| `["ban", userId]`           | `{ firstName, lastName, at }`                                         | Name is a snapshot; it survives profile deletion.            |
+| `["channel", channelId]`    | `boolean`                                                             | Allowed channels.                                            |
+| `["open"]`                  | `boolean`                                                             | Only `false` disables the morning run; absent means enabled. |
+| `["duty"]`                  | `boolean`                                                             | Only `false` disables the duty list; absent means enabled.   |
 
 Sign-up is closed by time, not by a flag:
 
@@ -328,13 +331,13 @@ therefore never leave a post accepting sign-ups.
 - **Webhook authentication.** `deploy.ts` verifies
   `x-telegram-bot-api-secret-token` against `WEBHOOK_SECRET` before handing an
   update to grammY, and the webhook registration route is behind the same
-  secret. Without it, anyone who guessed the URL could forge an update
-  claiming to be the owner.
+  secret. Without it, anyone who guessed the URL could forge an update claiming
+  to be the owner.
 - **Untrusted input is validated at the boundary.** Post ids must match the
   nanoid shape, user ids must be positive safe integers, channel ids must be
   negative, and keyboard indices are bounds-checked against the session state.
-- **Names are escaped and bounded.** Posts are sent as HTML, so `&`, `<` and
-  `>` are escaped and names are capped at 32 characters; the rendered post is
+- **Names are escaped and bounded.** Posts are sent as HTML, so `&`, `<` and `>`
+  are escaped and names are capped at 32 characters; the rendered post is
   truncated at 3900. An unescaped ampersand used to break a post permanently.
 - **Bans are by Telegram id** and are enforced before any handler runs.
 
@@ -360,14 +363,33 @@ between deploys.
 
 ---
 
+## Duplicate posts
+
+`Deno.cron` is at-least-once: a handler that throws or exceeds its time budget
+is retried, and this one is deliberately slow because of the flood-control
+pauses between messages. `dailyPost` therefore records a post per channel per
+calendar day and skips a channel that already has one, so a repeated run is a
+no-op. `/cron` refuses for the same reason unless given `force`.
+
+That guard works within one database. Two instances running the same token with
+separate KV databases cannot see each other's posts, and each will publish once.
+Symptoms of that case: more posts than channels, state that `/dutyoff` appears
+not to affect, and a post whose list never updates when someone signs up.
+`/instance` prints the deployment id of the instance answering commands; compare
+it with the id in the `sign-up post ok [...]` log lines. Different ids mean a
+second instance, which is fixed in the deployment, not in the code — delete the
+extra project, clear its `TOKEN`, or stop the stray process. Setting `DUTY=off`
+in the environment silences the duty list on every instance that shares the
+configuration, regardless of what any database holds.
+
 ## Known limitations
 
-- **A blocked person can return on a second Telegram account.** Bans key on
-  the account, and the bot has no other identity to go on.
+- **A blocked person can return on a second Telegram account.** Bans key on the
+  account, and the bot has no other identity to go on.
 - **No atomic KV transactions.** Concurrent toggles can interleave; the effects
   are cosmetic and settle on the next refresh.
-- **Anyone can make the bot work.** The refresh pass runs on every update, so
-  a determined spammer costs KV reads. There is no rate limiting.
+- **Anyone can make the bot work.** The refresh pass runs on every update, so a
+  determined spammer costs KV reads. There is no rate limiting.
 - **`/duty` and `/post` are available to channel administrators**, per the note
   in [Security model](#security-model).
 - **`/cron` advances the rotation** exactly as the real job does. Undo with

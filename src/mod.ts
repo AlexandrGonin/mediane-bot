@@ -1,9 +1,9 @@
 import { DenoKVAdapter } from "storage";
-import { Bot, Context, InlineKeyboard, session, SessionFlavor } from "grammy";
+import { Bot, Context, session, SessionFlavor } from "grammy";
 import {
   channelComposer,
-  REG_WINDOW,
   refreshPosts,
+  REG_WINDOW,
   updatePost,
 } from "./composers/channel.ts";
 import { entryComposer } from "./composers/entry.ts";
@@ -48,6 +48,16 @@ if (!OWNER_ID) {
 
 const BAN_TEXT = "Вы были заблокированы, можете обратиться к администратору";
 
+// Hard override for the duty list, read from the environment. A KV flag lives
+// in one database; if the deployment is ever bound to a different one, or a
+// second instance runs with a database of its own, the flag set by /dutyoff is
+// simply not there and the list comes back. DUTY=off cannot drift that way.
+export const DUTY_ENV_OFF =
+  (Deno.env.get("DUTY") ?? "").toLowerCase() === "off";
+
+// Identifies which instance produced a log line or answered /instance.
+export const INSTANCE = Deno.env.get("DENO_DEPLOYMENT_ID") ?? "local";
+
 // How long a closed post is kept before it and its entries are deleted.
 const PURGE_AFTER = 3 * 24 * 60 * 60 * 1000;
 
@@ -81,7 +91,7 @@ bot.use(async (ctx, next) => {
 
 // Keeps channel posts in sync after any action. refreshPosts skips the API
 // call when nothing changed, so ordinary traffic costs no Telegram requests.
-bot.use(async (ctx, next) => {
+bot.use(async (_ctx, next) => {
   await next();
   try {
     await refreshPosts();
@@ -119,7 +129,10 @@ bot.chatType("private").filter(isOwner).command("dutyoff", async (ctx) => {
   await kv.set(["duty"], false);
   await ctx.reply(
     "Дежурства больше не публикуются, столовая продолжает работать.\n" +
-      "Очередь стоит на месте. Включить обратно: /dutyon",
+      "Очередь стоит на месте. Включить обратно: /dutyon\n\n" +
+      (DUTY_ENV_OFF
+        ? "DUTY=off задан в окружении — выключено жёстко."
+        : "Этот флаг живёт в базе. Чтобы выключить намертво, задай DUTY=off в окружении."),
   );
 });
 
@@ -137,19 +150,50 @@ bot.use(channelComposer);
 // --- scheduled work ---
 
 // Publishes the sign-up post and the duty list, then advances the rotation.
-export const dailyPost = async () => {
+// Calendar day in the business timezone, used to recognise a post as today's.
+export const dayStamp = (date: Date) =>
+  date.toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+
+// Channels that already have a post for today, so a repeated run is a no-op.
+// Deno.cron is at-least-once: a handler that times out or throws is retried,
+// and this one is deliberately slow because of the flood-control pauses.
+export const channelsPostedToday = async () => {
+  const today = dayStamp(new Date());
+  return new Set(
+    (await listPosts())
+      .filter((p) => dayStamp(new Date(p.date)) === today)
+      .map((p) => p.channel_id),
+  );
+};
+
+export const dailyPost = async (force = false) => {
   // Enabled by default; only an explicit /stop turns posting off.
   if ((await kv.get<boolean>(["open"])).value === false) return;
 
   // The duty list is switched separately, and while it is off the rotation
   // stays put: advancing it would silently skip groups for every day the
   // list was not published.
-  const dutyEnabled = (await kv.get<boolean>(["duty"])).value !== false;
+  const dutyEnabled = !DUTY_ENV_OFF &&
+    (await kv.get<boolean>(["duty"])).value !== false;
   const group = dutyEnabled ? (await currentGroup())?.members || [] : [];
-  if (dutyEnabled && group.length) await advanceOrder();
-  const dutyMessage = dutyEnabled && group.length ? await dutyText(group) : null;
+  const posted = force ? new Set<number>() : await channelsPostedToday();
 
-  for (const channel of await listChannels()) {
+  // Advance only if at least one channel is actually going to be posted to,
+  // otherwise a retried run would skip a group for nothing.
+  const allChannels = await listChannels();
+  const pending = allChannels.filter((c) => !posted.has(c.id));
+  if (dutyEnabled && group.length && pending.length) await advanceOrder();
+  const dutyMessage = dutyEnabled && group.length
+    ? await dutyText(group)
+    : null;
+
+  for (const channel of allChannels) {
+    if (posted.has(channel.id)) {
+      console.log(
+        `channel ${channel.id}: already posted today, skipped [${INSTANCE}]`,
+      );
+      continue;
+    }
     try {
       const now = new Date();
       const post = await bot.api.sendMessage(channel.id, "post");
@@ -163,7 +207,7 @@ export const dailyPost = async () => {
         closeAt: now.getTime() + REG_WINDOW,
       });
       await updatePost(postId);
-      console.log(`channel ${channel.id}: sign-up post ok`);
+      console.log(`channel ${channel.id}: sign-up post ok [${INSTANCE}]`);
     } catch (err) {
       console.error(`channel ${channel.id}: sign-up post failed:`, err);
     }
@@ -174,7 +218,7 @@ export const dailyPost = async () => {
     try {
       await new Promise((r) => setTimeout(r, 3000)); // avoid flood control
       await bot.api.sendMessage(channel.id, dutyMessage);
-      console.log(`channel ${channel.id}: duty list ok`);
+      console.log(`channel ${channel.id}: duty list ok [${INSTANCE}]`);
     } catch (err) {
       console.error(`channel ${channel.id}: duty list failed:`, err);
     }
@@ -197,7 +241,9 @@ export const isWorkday = (date = new Date()) =>
 Deno.cron("daily entry", "15 2 * * *", async () => {
   const weekday = weekdayIn(TIMEZONE, new Date());
   if (!WORK_DAYS.has(weekday)) {
-    console.log(`daily entry: ${weekday} is a day off, nothing published`);
+    console.log(
+      `daily entry: ${weekday} is a day off, nothing published [${INSTANCE}]`,
+    );
     return;
   }
   await dailyPost();

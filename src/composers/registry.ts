@@ -20,7 +20,9 @@ const genReplyMarkup = (ctx: BotContext) => {
       }`,
       "paid",
     ).row();
-  if (ctx.session.name && ctx.session.surname && ctx.session.isFree != undefined) {
+  if (
+    ctx.session.name && ctx.session.surname && ctx.session.isFree != undefined
+  ) {
     reply_markup.text("Подтвердить и закончить", "check");
   } else {
     reply_markup.text("Необходимо заполнить все поля❗", "noop");

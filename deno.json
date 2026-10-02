@@ -2,14 +2,18 @@
   "$schema": "https://raw.githubusercontent.com/denoland/deno/main/cli/schemas/config-file.v1.json",
   "tasks": {
     "start": "deno run -A --watch dev.ts",
-    "check": "deno check dev.ts deploy.ts",
+    "check": "deno check --allow-import dev.ts deploy.ts",
     "fmt": "deno fmt",
     "lint": "deno lint"
   },
   "imports": {
-    "grammy": "https://deno.land/x/grammy/mod.ts",
-    "storage": "https://deno.land/x/grammy_storages/denokv/src/mod.ts",
-    "nanoid": "https://deno.land/x/nanoid/mod.ts"
+    "grammy": "https://deno.land/x/grammy@v1.45.1/mod.ts",
+    "storage": "https://deno.land/x/grammy_storages@v2.6.0/denokv/src/mod.ts",
+    "nanoid": "https://deno.land/x/nanoid@v3.0.0/mod.ts",
+    "@std/dotenv/load": "jsr:@std/dotenv@0.225.8/load"
   },
-  "unstable": ["kv", "cron"]
+  "unstable": [
+    "kv",
+    "cron"
+  ]
 }

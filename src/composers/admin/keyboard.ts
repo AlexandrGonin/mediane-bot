@@ -18,9 +18,7 @@ owner.command("schedule", async (ctx) => {
   const groups = await getGroups();
   const people = await profileMap();
 
-  const schedule = groups.map((group) =>
-    group.filter((id) => people.has(id))
-  );
+  const schedule = groups.map((group) => group.filter((id) => people.has(id)));
   const placed = new Set(schedule.flat());
   schedule.push([...people.keys()].filter((id) => !placed.has(id)));
 
